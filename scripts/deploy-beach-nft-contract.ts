@@ -63,6 +63,8 @@ async function main() {
   await beach.deployed();
   console.log("Beach deployed to:", beach.address);
 
+  // TODO: Transfer Ownership to DAO address
+
   // hre.ethers.provider.on("Transfer", (...args: any) =>
   //   console.log("Transfer event received", ...args)
   // );
