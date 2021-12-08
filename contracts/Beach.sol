@@ -1,4 +1,48 @@
 // SPDX-License-Identifier: MIT
+
+/**
+ccloool:::cc::::cc:::::cccccloooooool;;loddc...............,:'....''...,cc...''...,ll.................';:;,',,'',,;,';:;;:lll::clc;;;;;
+ccccllc:::cc:::::::::::c:clccllloolllooooodo,.............,loc'.......:dkkl,;odooodxxl:;;'..............',...........''.';ccc:;:c;....'
+::::::::::cc::::::;;:::cclllcccloooollloooddl:,,;:,...';clooddo,.....,lxkkxxxkkkxxxxxddxxdoc,.':cllc;'.....''.''..........,,,'.''......
+::::::;;:;::;;;;;;;::::ccclllccllllllloooooooooooool:clddddddddo:..';ldxkkxxxxxxxxxxdxxdddxxdodxxxxxxxo:,'cdddxxdolldl::,.........;clc'
+:;;;;;:;:;:;;;;:::;;:::::cclccllccllllddolodoooooddododddodoodxddoodddoxkxxxxxxxdxxddxxdooddoddxkxxkkkkkxdkOxxkOOkkOOkkko:,'';c:';dkOkd
+;,,,;;;;::;;,,;;::;,;:;;::cccccccllllllolooooooooooooollooloooodddoooddxkxddxxddddxddxxoodddddddxxxkkkkkkxkkxkkkkkkxkOkxkOOxxkkkxxkkOOO
+,,,,;;,;;;,,,,;;;;;,;;;;;::::ccclollccclloollllloolllllcccclooodoodddddddxdodddddddddddddddddooodddxkxkOkxkxxkOkkkxxkkOkkkOOOkkOOkxkkkO
+',,,,,',,,,,,,,,,'',,,,',,;::ccccccclcccloollolllolllcclccllccloooddddoodxddxddxdoooododdoloolodxdddxxxkkkxxkkOkkkkkkxxdxkkkOOkkOkxkkxk
+'',,,'''''''''''....'''''',;::::::cc:c::clc:clllllllllcccc:ccclloodxdoodooooddddoooooooooollooooodxxxkxkkxkxkkkkkkxxkxxdxkkkkxxkkkxkOkx
+'''''..'''...''........''..',,,,;:c:;;;;:c::cccccclllcccc::::cclllodooloolloddooolllloololcclollddddxkxddkkxxkkkxxxxkkkkxxkkxxdkOkkxxkO
+.............................''',,,,,,,;::::::cc::::ccc::;;;;;::clccccllollllooollccccllccccclllooooodxddxxxxkxxxxxxxkkkkxxxdxxxkkxxxxx
+.......................................',,;:;;;:;;;;;:;;,,,,,,;;:cc:::cllc:cccllcccc:;:c::::ccccllooodddddkkxxxxddxxxxxxxxxddxxxxkkxxxx
+..........................................''',,,,;;,,,''......'',;;,,,;:::;:::cc::::;:::;;;;;;;:ccllooolododddxdddxxxddxddxxxdodxxxxxdd
+..................'',,..,;;...................''.''''.................'',;;;;:::;,,,,,,'''..',,;:cccllloooloddxoodxkxddodddxxoodxddddoo
+...............',;;;;coxxxkxolllc:,........';coddol:'.............:lllll;'''',,,..;coddddol:,...,;:oxkxxolloodddkOO0kdoooodddoooddoddoo
+.....',,;,',,,,,,;;;,:OXXXXXXXXXXXKOd:;;,:dOKXXXXXXXOl'....,,;:;;xKXXXN0;......;lk0XXXXXXXXX0xc...,kXXXklllclold0XXKklllllooolloooooooo
+'',,,,,,,,,,',,,,,,,'l0XXKkddxxxOKXXXx:;;lkKOxdllxKXXKd;;;;:::lkKXXXXXX0c..'',o0XXXKkdddoxOKXXO:..,OXXKo,;;:clcdKXX0dccc::ccccccclllccl
+''',,'',,,,''''''''''oXXXk:,,,;,:OXXXx;,;,;c;,,,,c0XXXd,',;,;d0XX0KXXXXkc:::oOXXX0xl:::;;:coxoc:;'lKXXO,..'.',;xXXXOc,,''',,;,,;:cc:::c
+'''''''''''''''''''.,xXXXOdoooddOKXKk:'',,'':oddx0XXKx;''',lkKXKdo0NXXKo::::xXXX0o;;::;;;:::;::::cOXXX0dlllllooOXXKo'...........,;;;,,;
+'...'...''....'.....;OXXXXXXXXXXXXXx;...''.'oXNXXXXKo,''.;dKXKxc,lKXXX0c,;,cOXXXd;,,;;;,;;,;;;;::l0XXXXXXXXXXXXXXX0c',;clc:;,;;........
+....................cKXX0ollllodOXXKo'......:oooxKXX0c..cOXXXOolokXXXX0ol;.:OXXXd''',,,,,''',,,,,l0XXKOkkxkxxk0XXX0lclllccclloo:,'..,,'
+....................dXXXd'......oKXXk'...'.......dXXXx.'kNXXXXXXXXXXXXXNK:.'dXXX0c'..''''';l:,'',dKXXOl:::::clkXXXkc::cc::::ccc:c:;;;;,
+...................'kXXXkcccclld0XXKo..;d0kl:;;:o0XXKl..clllllllxKXXXKdlc...'xXXXKxlc::clx0X0o'.,xXXXx;,,;;;:l0XXKd::::::;;::c:;;;,''..
+...................;0NXXXXXXXXXXXKkc...l0XXXXKKXXXKOc...........cKXXXO;.......ckKXXXXXXXXXX0d:..;OXXKc....',;oKXX0c,'''',',;;;;'.......
+...................,ooooooooooolc,...',,:lx000KKKOd;...,:;......:k000Oxooc;;;:clllodxxxdol:'....'lddl'......':oodc'.........'.........,
+.................................':codxxooddxkxxkxxocodxkkxdoooccododdxxddxkxxkxoc;;;,..''',;'...........'...........'...........';coox
+................................,cxxxkxdxxdodxddodxddxkxdxkxdddoooooddodddxxdxkxoodddollddooddo:'.,cl:::ll:'..':lc::lollccc,'..'cdxdxxx
+....................;c:;;col:;:llooxkxxdodxdoodxdolodxxoloddkdlooodxdodxxddddddxdododdoooooooddollooddoolllc:clodxdooodxddxxdlooxxddkOk
+::;;;;:;'...';;cc:cloodoodooolllllloxxdllddoxdoddooooddoddooddddolldooddloollllooloooooddoloolodolloooodoooolooloooolodxxdodooooxxoodxo
+dlclocldolllccclooolloolol:cooolccclllollodooooollooccloollodddoloolllolldlcllooooodocclooloolllllollloxolollccoollooolodloollllddlcodl
+:lccllolcoool::cclllllc:ccccllcc::lccldollccc:lolcllcllol:cclooollllloolllccldllllll::cc:ccloodolcccccloccc:ccccoolllooooodoloccddlcddo
+cccccc::c:cllc:::c::cccclclc:cc;;:::::cccc:;::cllccc:clllc:lcccclclllool::ccclc:ll::cccc:::ccccccc:::lllccc:::cclccllcccloollcc:looooll
+c:,,,,;;:;;;::;;,,;;:::::::;,,;,;:;;;::::cc::;,;:cc::cllcc:clol::;:cccllc:;:cc:;:;;cl:;;;;;;;;,;c:;;;:clc;;::::;;;;:cccccll:clc:ldolc;:
+,,,,,,,,'',,,,,,;:;,,,,',,,,,,;,,,''',,,,,'',,,,,;:;;:::;:;;cc::;;::::::;,,,',;,,',;:;,''',,,,,;,'',,',,,,,,,;,,,,,;;;:;:clc:c:cddc:ccc
+..'...........''''''....''...''..............'..'''''';:;,,',,',,,,,;:,,,'''..'...''.....''...''..'''''.........'..',;;,,,,,:;,:ol;;;;,
+...........................................................''''''''..'..'.'...........................................'.','''..;dc,'''.
+,;;;;;;;;,,,''''.......'',,;;::cccccccccccc::;;,'..............................',;;::cccc::;;,,'''''',,;;:::cc:;,'.............lx:'....
+0KK0KKKK0000OOOOOkOOOOOO0000KKKKKKKKKKKKKKKKKKKK0Okdolc:;;,'''''',,,,;::clodxkO00KKKKKKKXKKKKK00000000KKKKKKKKKKKOkdl:,.......cOx,....;
+KKKKKKKK00KKK0KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK0KKKKK00K00000000KK0KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK0Oxddddk0Ko..:ok0
+KKKKKKKKKKKKKKK00KKKKKKKKKKKK0KKKKKKKKK0KKKKKKKKKKK0KKK00KKKKK00KKKKKK00KKKKKKKKKKKKKKKKKKKK00KKKKKKKKKK00KKKKKKKKKKKKKKKKKKK0KKl'oKK00
+*/
+
 pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -58,7 +102,7 @@ contract Beach is ERC721, Ownable {
     if (_revealed == false) {
       return _baseURI();
     } else {
-      return string(abi.encodePacked(_baseURI(), _revealedPath, "/", Strings.toString(tokenId)));
+      return string(abi.encodePacked(_baseURI(), _revealedPath, "/", Strings.toString(tokenId), ".png"));
     }
   }
   modifier mintOpened() {

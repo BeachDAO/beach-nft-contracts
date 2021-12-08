@@ -1,5 +1,4 @@
 // eslint-disable-next-line node/no-extraneous-import
-// eslint-disable-next-line node/no-extraneous-import
 import { Signer } from "@ethersproject/abstract-signer";
 import { expect } from "chai";
 import { ethers } from "hardhat";
@@ -145,7 +144,7 @@ describe("Beach NFT", function () {
       addressArt,
       addressDev,
       addressDAO,
-    ] = await ethers.getSigners();
+    ] = await hre.ethers.getSigners();
 
     royaltiesAccountsSigners = [addressArt, addressDev, addressDAO];
     royaltiesAccounts = [
