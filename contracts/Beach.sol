@@ -51,21 +51,77 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
+interface IERC20Burnable {
+  function burnFrom(address account, uint256 amount) public virtual;
+}
+
+library NameValidation {
+  function validateName(string memory str) public pure returns (bool){
+    bytes memory b = bytes(str);
+    if (b.length < 1) return false;
+    if (b.length > 25) return false;
+    // Cannot be longer than 25 characters
+    if (b[0] == 0x20) return false;
+    // Leading space
+    if (b[b.length - 1] == 0x20) return false;
+    // Trailing space
+
+    bytes1 lastChar = b[0];
+
+    for (uint i; i < b.length; i++) {
+      bytes1 char = b[i];
+
+      if (char == 0x20 && lastChar == 0x20) return false;
+      // Cannot contain continous spaces
+
+      if (
+        !(char >= 0x30 && char <= 0x39) && //9-0
+      !(char >= 0x41 && char <= 0x5A) && //A-Z
+      !(char >= 0x61 && char <= 0x7A) && //a-z
+      !(char == 0x20) //space
+      )
+        return false;
+
+      lastChar = char;
+    }
+
+    return true;
+  }
+
+  /**
+  * @dev Converts the string to lowercase
+	 */
+  function toLower(string memory str) public pure returns (string memory){
+    bytes memory bStr = bytes(str);
+    bytes memory bLower = new bytes(bStr.length);
+    for (uint i = 0; i < bStr.length; i++) {
+      // Uppercase character
+      if ((uint8(bStr[i]) >= 65) && (uint8(bStr[i]) <= 90)) {
+        bLower[i] = bytes1(uint8(bStr[i]) + 32);
+      } else {
+        bLower[i] = bStr[i];
+      }
+    }
+    return string(bLower);
+  }
+}
+
 contract Beach is ERC721, Ownable {
-  uint256 private _tokenIdCounter = 0;
-  uint16 public MAX_SUPPLY = 1337;
+  uint private _tokenIdCounter = 0;
+  uint public MAX_SUPPLY = 1337;
 
   bool private _revealed = false;
   string private _baseURIPath = "https://lobby.mypinata.cloud/ipfs/";
   string private _revealedPath = "nope";
 
   address private lobster;
-  address private beach; // TODO
+  address private beach;
 
   uint mintBlock;
 
-  mapping(uint256 => string) _beachNames; // TODO
-  mapping(string => bool) _existingNames; // TODO
+  mapping(uint256 => string) _beachNames;
+  mapping(string => bool) _existingNames;
+  uint AMOUNT_NEEDED_FOR_NAME_CHANGE = 10;
 
   mapping(address => uint8) private shares;
   mapping(address => uint256) private released;
@@ -79,8 +135,9 @@ contract Beach is ERC721, Ownable {
   event NFTMinted(uint256 tokenId, address mintedBy);
   event Revealed();
   event PathUpdated(string path_);
+  event NameChanged(string name_);
 
-  constructor(address _lobster, address[] memory accounts_, uint8[] memory shares_, uint blocksBeforeTheMint) ERC721("Beach", "BEACH") {
+  constructor(address _lobster, address[] memory accounts_, uint8[] memory shares_, uint blocksBeforeTheMint) ERC721("Beach", "BEACH-NFT") {
     lobster = _lobster;
 
     for (uint8 i = 0; i < accounts_.length; i++) {
@@ -102,9 +159,14 @@ contract Beach is ERC721, Ownable {
     if (_revealed == false) {
       return _baseURI();
     } else {
-      return string(abi.encodePacked(_baseURI(), _revealedPath, "/", Strings.toString(tokenId), ".png"));
+      return string(abi.encodePacked(_baseURI(), _revealedPath, "/", Strings.toString(tokenId), ".json"));
     }
   }
+
+  function totalSupply() public view returns (uint) {
+    return _tokenIdCounter;
+  }
+
   modifier mintOpened() {
     require(block.number > mintBlock, "BEACH: Mint block is not ready yet");
     _;
@@ -129,14 +191,64 @@ contract Beach is ERC721, Ownable {
   unchecked {
     _tokenIdCounter += 1;
   }
+    setName(_tokenIdCounter, Strings.toString(_tokenIdCounter));
   }
 
-  function _mintABeach(address to) private returns (bool){
+  function _mintABeach(address to) private {
     require(_tokenIdCounter < MAX_SUPPLY, "BEACH: mint reached max supply");
     _safeMint(to, _tokenIdCounter);
   unchecked {
     _tokenIdCounter += 1;
   }
+    setName(_tokenIdCounter, Strings.toString(_tokenIdCounter));
+  }
+
+  /**
+   * Name management
+   */
+  function setName(uint tokenId_, string memory name_) public {
+    address owner = ownerOf(tokenId_);
+    require(owner == msg.sender, "BEACH: You do not own this token");
+    require(NameValidation.validateName(name_), "BEACH: Name is not valid");
+    require(nameExists(name_) == false, "BEACH: Name requested is already used, please chose another");
+    require(resolveBeachBalance(msg.sender) > AMOUNT_NEEDED_FOR_NAME_CHANGE, "BEACH: You do not have enough $BEACH balance (10) to change the name");
+
+    // Burn $BEACH
+    _burnBeachToken(10);
+    _setName(tokenId_, name_);
+  }
+
+  function _setName(uint tokenId_, string memory name_) private {
+    if (bytes(_beachNames[tokenId_]).length > 0) {
+      _existingNames[_beachNames[tokenId_]] = false;
+    }
+    _beachNames[tokenId_] = name_;
+    _existingNames[NameValidation.toLower(name_)] = true;
+    emit NameChanged(name_);
+  }
+
+  function nameExists(string memory name_) public view returns (bool) {
+    return _existingNames[NameValidation.toLower(name_)];
+  }
+
+  function validateName(string memory name_) public pure returns (bool) {
+    return NameValidation.validateName(name_);
+  }
+
+  function beachName(uint tokenId_) public view returns (string) {
+    return _beachNames[tokenId_];
+  }
+
+  /**
+   * $BEACH management
+   */
+  function resolveBeachBalance(address account) internal returns (uint) {
+    return IERC20(beach).balanceOf(account);
+  }
+
+  function _burnBeachToken(uint amount) private returns (bool) {
+    require(resolveBeachBalance(msg.sender) >= amount, "BEACH: Not enough $BEACH balance to burn the requested amount");
+    IERC20Burnable(beach).burnFrom(msg.sender, 10);
     return true;
   }
 
@@ -289,7 +401,7 @@ contract Beach is ERC721, Ownable {
   }
 
   modifier onlyAccountOrOwner() {
-    require(owner() == _msgSender() || shares[_msgSender()] > 0 || balances[_msgSender()] > 0, "Caller is not the owner or a valid account");
+    require(owner() == msg.sender || shares[msg.sender] > 0 || balances[msg.sender] > 0, "Caller is not the owner or a valid account");
     _;
   }
 }

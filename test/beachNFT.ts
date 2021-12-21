@@ -1,6 +1,7 @@
 // eslint-disable-next-line node/no-extraneous-import
 import { Signer } from "@ethersproject/abstract-signer";
 import { expect } from "chai";
+import { Contract } from "ethers";
 import { ethers } from "hardhat";
 // eslint-disable-next-line node/no-missing-import
 import { Beach, LobsterMock } from "../typechain";
@@ -10,12 +11,12 @@ const hre = require("hardhat");
 
 let BeachNFT;
 let LobsterMockContract;
-let lobsterMock: LobsterMock;
-let beachNFT: Beach,
-  beachNFT137: Beach,
-  beachNFT317: Beach,
-  beachNFT713: Beach,
-  beachNFTMint: Beach;
+let lobsterMock: Contract;
+let beachNFT: Beach | Contract,
+  beachNFT137: Beach | Contract,
+  beachNFT317: Beach | Contract,
+  beachNFT713: Beach | Contract,
+  beachNFTMint: Beach | Contract;
 
 let multiSigOwner: Signer,
   address1: Signer,
@@ -43,7 +44,7 @@ const priceOverride1 = {
 const blocksUntilMintOpens = 250;
 
 // eslint-disable-next-line no-unused-vars
-async function mintMany(n: number, address: string, chain: Beach = beachNFT) {
+async function mintMany(n: number, address: string, chain = beachNFT) {
   for (let i = 0; i < n; i++) {
     await chain.safeMint(address);
   }
@@ -68,9 +69,10 @@ describe("Beach NFT", function () {
   // [x] Should have a reveal function that can be called only by owner
   // [x] I should be able to transfer my NFT
   // [x] Minting should only be possible at a specific block, set at contract creation
-  // [ ] When the reveal function is called, it should set the proper IPFS base and point metadata to the right file
+  // [x] When the reveal function is called, it should set the proper IPFS base and point metadata to the right file
+  // [x] TotalSupply should return the right value
   // [ ] Default image and metadata should be visible
-  // [ ] Each BEACH has a name
+  // [x] Each BEACH has a name
   // [ ] I can change my BEACH name against 10 $BEACH
   //
   // *** Beach Specific behavior ***
@@ -251,7 +253,7 @@ describe("Beach NFT", function () {
       expect(await beachNFT.tokenURI(0)).to.equal(basePathURI);
       await beachNFT.connect(multiSigOwner).reveal(revealPath);
       expect(await beachNFT.tokenURI(0)).to.equal(
-        basePathURI.concat(revealPath, "/0")
+        basePathURI.concat(revealPath, "/0.json")
       );
     });
 
@@ -266,6 +268,22 @@ describe("Beach NFT", function () {
         .connect(multiSigOwner)
         .safeMint(await address1.getAddress());
       expect(await beachNFT.currentTokenId()).to.equal(1);
+    });
+
+    it("Should have correct totalSupply()", async function () {
+      expect(await beachNFT.totalSupply()).to.equal(0);
+      // Should equal 1 after 1 mint
+      await beachNFT
+        .connect(multiSigOwner)
+        .safeMint(await address1.getAddress());
+      expect(await beachNFT.totalSupply()).to.equal(1);
+    });
+
+    it("Should have a name", async function () {
+      await beachNFT
+        .connect(multiSigOwner)
+        .safeMint(await address1.getAddress());
+      expect(beachNFT.beachName(0)).to.equal("0");
     });
 
     it("Should be able to transfer NFT", async function () {
