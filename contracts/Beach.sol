@@ -46,6 +46,7 @@ KKKKKKKKKKKKKKK00KKKKKKKKKKKK0KKKKKKKKK0KKKKKKKKKKK0KKK00KKKKK00KKKKKK00KKKKKKKK
 pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
@@ -55,58 +56,7 @@ interface IERC20Burnable {
   function burnFrom(address account, uint256 amount) external;
 }
 
-library NameValidation {
-  function validateName(string memory str) public pure returns (bool){
-    bytes memory b = bytes(str);
-    if (b.length < 1) return false;
-    if (b.length > 25) return false;
-    // Cannot be longer than 25 characters
-    if (b[0] == 0x20) return false;
-    // Leading space
-    if (b[b.length - 1] == 0x20) return false;
-    // Trailing space
-
-    bytes1 lastChar = b[0];
-
-    for (uint i; i < b.length; i++) {
-      bytes1 char = b[i];
-
-      if (char == 0x20 && lastChar == 0x20) return false;
-      // Cannot contain continous spaces
-
-      if (
-        !(char >= 0x30 && char <= 0x39) && //9-0
-      !(char >= 0x41 && char <= 0x5A) && //A-Z
-      !(char >= 0x61 && char <= 0x7A) && //a-z
-      !(char == 0x20) //space
-      )
-        return false;
-
-      lastChar = char;
-    }
-
-    return true;
-  }
-
-  /**
-  * @dev Converts the string to lowercase
-	 */
-  function toLower(string memory str) public pure returns (string memory){
-    bytes memory bStr = bytes(str);
-    bytes memory bLower = new bytes(bStr.length);
-    for (uint i = 0; i < bStr.length; i++) {
-      // Uppercase character
-      if ((uint8(bStr[i]) >= 65) && (uint8(bStr[i]) <= 90)) {
-        bLower[i] = bytes1(uint8(bStr[i]) + 32);
-      } else {
-        bLower[i] = bStr[i];
-      }
-    }
-    return string(bLower);
-  }
-}
-
-contract Beach is ERC721, Ownable {
+contract Beach is ERC721, ERC721Enumerable, Ownable {
   uint private _tokenIdCounter = 0;
   uint public MAX_SUPPLY = 1337;
 
@@ -163,10 +113,6 @@ contract Beach is ERC721, Ownable {
     }
   }
 
-  function totalSupply() public view returns (uint) {
-    return _tokenIdCounter;
-  }
-
   modifier mintOpened() {
     require(block.number > mintBlock, "BEACH: Mint block is not ready yet");
     _;
@@ -209,7 +155,7 @@ contract Beach is ERC721, Ownable {
   function setName(uint tokenId_, string memory name_) public {
     address owner = ownerOf(tokenId_);
     require(owner == msg.sender, "BEACH: You do not own this token");
-    require(NameValidation.validateName(name_), "BEACH: Name is not valid");
+    require(validateName(name_), "BEACH: Name is not valid");
     require(nameExists(name_) == false, "BEACH: Name requested is already used, please chose another");
     require(resolveBeachBalance(msg.sender) > AMOUNT_NEEDED_FOR_NAME_CHANGE, "BEACH: You do not have enough $BEACH balance (10) to change the name");
 
@@ -223,20 +169,65 @@ contract Beach is ERC721, Ownable {
       _existingNames[_beachNames[tokenId_]] = false;
     }
     _beachNames[tokenId_] = name_;
-    _existingNames[NameValidation.toLower(name_)] = true;
+    _existingNames[toLower(name_)] = true;
     emit NameChanged(name_);
   }
 
   function nameExists(string memory name_) public view returns (bool) {
-    return _existingNames[NameValidation.toLower(name_)];
-  }
-
-  function validateName(string memory name_) public pure returns (bool) {
-    return NameValidation.validateName(name_);
+    return _existingNames[toLower(name_)];
   }
 
   function beachName(uint tokenId_) public view returns (string memory) {
     return _beachNames[tokenId_];
+  }
+
+  function validateName(string memory str) public pure returns (bool){
+    bytes memory b = bytes(str);
+    if (b.length < 1) return false;
+    if (b.length > 25) return false;
+    // Cannot be longer than 25 characters
+    if (b[0] == 0x20) return false;
+    // Leading space
+    if (b[b.length - 1] == 0x20) return false;
+    // Trailing space
+
+    bytes1 lastChar = b[0];
+
+    for (uint i; i < b.length; i++) {
+      bytes1 char = b[i];
+
+      if (char == 0x20 && lastChar == 0x20) return false;
+      // Cannot contain continous spaces
+
+      if (
+        !(char >= 0x30 && char <= 0x39) && //9-0
+      !(char >= 0x41 && char <= 0x5A) && //A-Z
+      !(char >= 0x61 && char <= 0x7A) && //a-z
+      !(char == 0x20) //space
+      )
+        return false;
+
+      lastChar = char;
+    }
+
+    return true;
+  }
+
+  /**
+  * @dev Converts the string to lowercase
+	 */
+  function toLower(string memory str) public pure returns (string memory){
+    bytes memory bStr = bytes(str);
+    bytes memory bLower = new bytes(bStr.length);
+    for (uint i = 0; i < bStr.length; i++) {
+      // Uppercase character
+      if ((uint8(bStr[i]) >= 65) && (uint8(bStr[i]) <= 90)) {
+        bLower[i] = bytes1(uint8(bStr[i]) + 32);
+      } else {
+        bLower[i] = bStr[i];
+      }
+    }
+    return string(bLower);
   }
 
   /**
@@ -258,7 +249,7 @@ contract Beach is ERC721, Ownable {
 
   function _beforeTokenTransfer(address from, address to, uint256 tokenId)
   internal
-  override(ERC721)
+  override(ERC721, ERC721Enumerable)
   {
     super._beforeTokenTransfer(from, to, tokenId);
   }
@@ -266,7 +257,7 @@ contract Beach is ERC721, Ownable {
   function supportsInterface(bytes4 interfaceId)
   public
   view
-  override(ERC721)
+  override(ERC721, ERC721Enumerable)
   returns (bool)
   {
     return super.supportsInterface(interfaceId);

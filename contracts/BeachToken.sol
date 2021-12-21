@@ -61,7 +61,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
 
   constructor() ERC20("B34CH Life Currency", "$BEACH") {
     _mint(msg.sender, MAX_SUPPLY * 10 ** decimals());
-
+    _modifyCreedAllowList(address(this), name(), DROP_RATE, true);
   }
 
   function pause() public onlyOwner {
@@ -90,18 +90,18 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     return stakingId_;
   }
 
-  function stake(uint token_, address creed_) public {
+  function stake(uint tokenId_, address creed_) public {
     uint[] memory myStakes_ = _getMyStakingInfo();
 
     require(_creedAllowList[creed_].allowed == true, "$BEACH: This token is not allowed yet");
-    require(IERC721(creed_).ownerOf(token_) == msg.sender, "$BEACH: You do not own this token");
+    require(IERC721(creed_).ownerOf(tokenId_) == msg.sender, "$BEACH: You do not own this token");
     require(myStakes_.length < MAX_STAKING, "$BEACH: You already have too many items staked");
 
-    _transferTokenFromOwner(creed_, token_, msg.sender);
+    _transferTokenFromOwner(creed_, tokenId_, msg.sender);
 
     // Breaking init into multiple statements to optimize for gas
     Staking memory staking;
-    staking.tokenId = token_;
+    staking.tokenId = tokenId_;
     staking.creed = creed_;
     staking.owner = msg.sender;
     staking.startingBlock = block.number;
@@ -111,7 +111,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
 
     _stakings[stakingId] = staking;
     // TokenId by creed
-    _stakingByCreed[creed_][token_] = stakingId;
+    _stakingByCreed[creed_][tokenId_] = stakingId;
     // Adding to sender IDs
     _stakingsByOwner[msg.sender].push(stakingId);
   }
@@ -136,6 +136,10 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     uint blocksSinceStaking = lastStakingBlock - _staking.startingBlock;
     uint balance = blocksSinceStaking * dropRate_ - _staking.claimedAmount;
     return balance;
+  }
+
+  function getMyStakingIds() public view returns (uint[] memory) {
+    return _getMyStakingInfo();
   }
 
   function getMyStakingBalance() public view returns (uint) {
@@ -257,7 +261,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     _modifyCreedAllowList(creed_, name_, rate_, allowed_);
   }
 
-  function _modifyCreedAllowList(address creed_, string calldata name_, uint rate_, bool allowed_) private {
+  function _modifyCreedAllowList(address creed_, string memory name_, uint rate_, bool allowed_) private {
     Creed memory creedStruct_;
     creedStruct_.creed = creed_;
     creedStruct_.allowed = allowed_;
