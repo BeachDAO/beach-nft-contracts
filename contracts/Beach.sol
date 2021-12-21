@@ -52,7 +52,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 interface IERC20Burnable {
-  function burnFrom(address account, uint256 amount) public virtual;
+  function burnFrom(address account, uint256 amount) external;
 }
 
 library NameValidation {
@@ -235,14 +235,14 @@ contract Beach is ERC721, Ownable {
     return NameValidation.validateName(name_);
   }
 
-  function beachName(uint tokenId_) public view returns (string) {
+  function beachName(uint tokenId_) public view returns (string memory) {
     return _beachNames[tokenId_];
   }
 
   /**
    * $BEACH management
    */
-  function resolveBeachBalance(address account) internal returns (uint) {
+  function resolveBeachBalance(address account) internal view returns (uint) {
     return IERC20(beach).balanceOf(account);
   }
 

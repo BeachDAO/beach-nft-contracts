@@ -91,19 +91,19 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
   }
 
   function stake(uint token_, address creed_) public {
-    Staking[] storage myStakes = getMyStakingInfo();
+    uint[] memory myStakes_ = _getMyStakingInfo();
 
-    require(_creedAllowList[creed_] == true, "$BEACH: This token is not allowed yet");
+    require(_creedAllowList[creed_].allowed == true, "$BEACH: This token is not allowed yet");
     require(IERC721(creed_).ownerOf(token_) == msg.sender, "$BEACH: You do not own this token");
-    require(myStakes.length < MAX_STAKING, "$BEACH: You already have too many items staked");
+    require(myStakes_.length < MAX_STAKING, "$BEACH: You already have too many items staked");
 
-    _transferTokenFromOwner(creed_, token, msg.sender);
+    _transferTokenFromOwner(creed_, token_, msg.sender);
 
     // Breaking init into multiple statements to optimize for gas
-    Staking staking = Staking();
+    Staking memory staking;
     staking.tokenId = token_;
     staking.creed = creed_;
-    staking.owner = from;
+    staking.owner = msg.sender;
     staking.startingBlock = block.number;
     staking.claimedAmount = 0;
 
@@ -113,23 +113,22 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     // TokenId by creed
     _stakingByCreed[creed_][token_] = stakingId;
     // Adding to sender IDs
-    _stakingsByOwner[from].push(stakingId);
-
+    _stakingsByOwner[msg.sender].push(stakingId);
   }
 
-  function stakeByIds(uint[] memory tokens_, address[] creeds_) public {
-    require(tokens_.length == creeds_.length, "$BEACH: The amount of tokens and creeds are not equal");
-    for (uint i = 0; i < tokens_.length; i++) {
-      stake(tokens_[i], creeds_[i]);
+  function stakeByIds(uint[] calldata tokensIds_, address[] calldata creeds_) public {
+    require(tokensIds_.length == creeds_.length, "$BEACH: The amount of tokens and creeds are not equal");
+    for (uint i = 0; i < tokensIds_.length; i++) {
+      stake(tokensIds_[i], creeds_[i]);
     }
   }
 
-  function _getMyStakingInfo() private returns (uint[]) {
+  function _getMyStakingInfo() private view returns (uint[] memory) {
     return _stakingsByOwner[msg.sender];
   }
 
   function _getBalanceForStakingId(uint stakingId_) private view returns (uint) {
-    Staking _staking = _stakings[stakingId_];
+    Staking memory _staking = _stakings[stakingId_];
     address creed_ = _staking.creed;
     uint dropRate_ = _creedAllowList[creed_].rate;
 
@@ -140,10 +139,10 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
   }
 
   function getMyStakingBalance() public view returns (uint) {
-    uint[] stakingIds = _getMyStakingInfo();
+    uint[] memory stakingIds = _getMyStakingInfo();
     uint balance = 0;
 
-    for (uint i = 0; i < stakings.length; i++) {
+    for (uint i = 0; i < stakingIds.length; i++) {
       balance += _getBalanceForStakingId(stakingIds[i]);
     }
 
@@ -153,7 +152,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
   }
 
   function claimAll(bool close) public {
-    uint[] myStakingsIds = _getMyStakingInfo();
+    uint[] memory myStakingsIds = _getMyStakingInfo();
 
     _freezeBalance(msg.sender);
     uint balance = _balanceByOwner[msg.sender].claimableAmount;
@@ -162,15 +161,15 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
 
     for (uint i = 0; i < myStakingsIds.length; i++) {
       uint stakingId_ = myStakingsIds[i];
-      address creed_ = _stakings[stakingId_].creed;
-      uint tokenId_ = _stakings[stakingId_].tokenId;
-      uint holder_ = _getOwnerForCreedAndTokenId(creed_, tokenId_);
+      //      address creed_ = _stakings[stakingId_].creed;
+      //      uint tokenId_ = _stakings[stakingId_].tokenId;
+      //      address holder_ = _getOwnerForCreedAndTokenId(creed_, tokenId_);
 
       _markAsClaimed(stakingId_, close);
     }
 
     // TODO: Ensure that balance and amount are in the same precision (10e18)
-    _transfer(address(this), holder_, balance);
+    _transfer(address(this), msg.sender, balance);
 
     emit ClaimedBalance(msg.sender, balance);
   }
@@ -182,8 +181,8 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
   }
 
   function _freezeBalance(address holder_) private {
-    uint[] _stakingIds = _stakingsByOwner[holder_];
-    for (uint i = 0; i < _stakingsIds.length; i++) {
+    uint[] memory _stakingIds = _stakingsByOwner[holder_];
+    for (uint i = 0; i < _stakingIds.length; i++) {
       _freezeBalanceByStakingId(holder_, _stakingIds[i]);
     }
   }
@@ -201,7 +200,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     }
   }
 
-  function _getOwnerForCreedAndTokenId(address creed, uint tokenId) private {
+  function _getOwnerForCreedAndTokenId(address creed, uint tokenId) private view returns (address) {
     address currentHolder = IERC721(creed).ownerOf(tokenId);
     if (currentHolder == address(this)) {
       uint stakingId = _stakingByCreed[creed][tokenId];
@@ -218,22 +217,22 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
   }
 
   function unstakeAll() public {
-    uint[] myStakings = _getMyStakingInfo();
+    uint[] memory myStakings_ = _getMyStakingInfo();
 
-    for (uint i = 0; i < myStakings.length; i++) {
-      _unstakeByStakingId(myStakings[i]);
+    for (uint i = 0; i < myStakings_.length; i++) {
+      _unstakeByStakingId(myStakings_[i]);
     }
   }
 
   function _unstakeByStakingId(uint stakingId) private {
-    Staking staking = _stakings[stakingId];
-    require(staking.owner == msg.sender, "$BEACH: You do not own this token");
+    Staking memory staking_ = _stakings[stakingId];
+    require(staking_.owner == msg.sender, "$BEACH: You do not own this token");
 
     // Claim existing funds onto your wallet balance, ready to be transferred
-    _freezeBalanceByStakingId(staking.owner, stakingId);
+    _freezeBalanceByStakingId(staking_.owner, stakingId);
     _markAsClaimed(stakingId, true);
 
-    _transferTokenBackToOwner(staking.creed, staking.tokenId, staking.owner);
+    _transferTokenBackToOwner(staking_.creed, staking_.tokenId, staking_.owner);
   }
 
   function _transferTokenBackToOwner(address creed_, uint tokenId_, address owner_) private {
@@ -244,7 +243,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     IERC721(creed_).safeTransferFrom(owner_, address(this), tokenId_);
   }
 
-  function returnTokensToOwners(uint[] stakingIds_) public onlyOwner {
+  function returnTokensToOwners(uint[] calldata stakingIds_) public onlyOwner {
     for (uint i = 0; i < stakingIds_.length; i++) {
       address creed_ = _stakings[stakingIds_[i]].creed;
       uint tokenId_ = _stakings[stakingIds_[i]].tokenId;
@@ -254,17 +253,17 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     }
   }
 
-  function modifyCreedAllowList(address creed_, string name_, uint rate_, bool allowed_) public onlyOwner {
+  function modifyCreedAllowList(address creed_, string calldata name_, uint rate_, bool allowed_) public onlyOwner {
     _modifyCreedAllowList(creed_, name_, rate_, allowed_);
   }
 
-  function _modifyCreedAllowList(address creed_, string name_, uint rate_, bool allowed_) private {
-    Creed creed_ = Creed();
-    creed_.creed = creed_;
-    creed_.allowed = allowed_;
-    creed_.name = name_;
-    creed_.rate = rate_;
-    _creedAllowList[creed] = creed;
+  function _modifyCreedAllowList(address creed_, string calldata name_, uint rate_, bool allowed_) private {
+    Creed memory creedStruct_;
+    creedStruct_.creed = creed_;
+    creedStruct_.allowed = allowed_;
+    creedStruct_.name = name_;
+    creedStruct_.rate = rate_;
+    _creedAllowList[creed_] = creedStruct_;
 
     emit CreedAllowListUpdated(creed_, name_, rate_, allowed_);
   }
@@ -274,8 +273,8 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     address from,
     uint256 tokenId,
     bytes calldata data
-  ) external returns (bytes4) {
-    require(creedAllowList[msg.sender] == true, "$BEACH: This token is not allowed yet");
+  ) external override returns (bytes4) {
+    require(_creedAllowList[msg.sender].allowed == true, "$BEACH: This token is not allowed yet");
     return _onERC721ReceivedSelector;
   }
 }
