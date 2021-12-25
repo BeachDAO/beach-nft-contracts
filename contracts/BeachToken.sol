@@ -11,8 +11,6 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-import "hardhat/console.sol";
-
 /// @custom:security-contact nemb@hey.com
 contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable {
 
@@ -108,8 +106,6 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     staking.startingBlock = block.number;
     staking.claimedAmount = 0;
 
-    console.log("Block number: %d", block.number);
-
     uint stakingId = _reserveNextStakingId();
 
     _stakings[stakingId] = staking;
@@ -139,7 +135,6 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     uint lastStakingBlock = _staking.endingBlock > 0 ? _staking.endingBlock : block.number;
     uint blocksSinceStaking = lastStakingBlock - _staking.startingBlock;
 
-    console.log("Blocks since staking: %d, dropRate: %d, claimedAmount: %d", blocksSinceStaking, dropRate_, _staking.claimedAmount);
     uint balance = blocksSinceStaking * dropRate_ - _staking.claimedAmount;
     return balance;
   }
@@ -153,9 +148,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     uint balance = 0;
 
     for (uint i = 0; i < stakingIds.length; i++) {
-      uint thisTokenUnclaimedBalance = _getBalanceForStakingId(stakingIds[i]);
-      console.log("Unclaimed balance for token %d: %d", stakingIds[i], thisTokenUnclaimedBalance);
-      balance += thisTokenUnclaimedBalance;
+      balance += _getBalanceForStakingId(stakingIds[i]);
     }
 
     balance += _balanceByOwner[msg.sender].claimableAmount;
@@ -173,14 +166,8 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
 
     for (uint i = 0; i < myStakingsIds.length; i++) {
       uint stakingId_ = myStakingsIds[i];
-      //      address creed_ = _stakings[stakingId_].creed;
-      //      uint tokenId_ = _stakings[stakingId_].tokenId;
-      //      address holder_ = _getOwnerForCreedAndTokenId(creed_, tokenId_);
-
       _markAsClaimed(stakingId_, close);
     }
-
-    console.log("About to claim %d tokens", balance);
 
     _transfer(address(this), msg.sender, balance);
 
