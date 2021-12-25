@@ -134,19 +134,19 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
   function safeMint(address to) public onlyOwner {
     require(_tokenIdCounter < MAX_SUPPLY, "BEACH: mint reached max supply");
     _safeMint(to, _tokenIdCounter);
+    _setName(_tokenIdCounter, Strings.toString(_tokenIdCounter));
   unchecked {
     _tokenIdCounter += 1;
   }
-    setName(_tokenIdCounter, Strings.toString(_tokenIdCounter));
   }
 
   function _mintABeach(address to) private {
     require(_tokenIdCounter < MAX_SUPPLY, "BEACH: mint reached max supply");
     _safeMint(to, _tokenIdCounter);
+    _setName(_tokenIdCounter, Strings.toString(_tokenIdCounter));
   unchecked {
     _tokenIdCounter += 1;
   }
-    setName(_tokenIdCounter, Strings.toString(_tokenIdCounter));
   }
 
   /**

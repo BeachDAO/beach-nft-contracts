@@ -1,7 +1,7 @@
 // eslint-disable-next-line node/no-extraneous-import
 import { Signer } from "@ethersproject/abstract-signer";
 import { expect } from "chai";
-import { Contract } from "ethers";
+import { BigNumber, Contract } from "ethers";
 import { ethers } from "hardhat";
 // eslint-disable-next-line node/no-missing-import
 import { Beach, LobsterMock } from "../typechain";
@@ -51,7 +51,7 @@ async function mintMany(n: number, address: string, chain = beachNFT) {
 }
 
 async function advanceBlocks(blocks = 1) {
-  for (let i = 0; i < blocks; i++) {
+  for (let i = 1; i <= blocks; i++) {
     await hre.network.provider.send("evm_mine");
   }
 }
@@ -59,6 +59,15 @@ async function advanceBlocks(blocks = 1) {
 const unrevealedPath: string = "nope";
 const revealPath: string = "QmbE4SA82GkKHEtqxxnYjtMweN1a3x5e5UwbzAWUkNN3vk";
 const basePathURI: string = "https://lobby.mypinata.cloud/ipfs/";
+
+let DollarBeach;
+let dollarBeach: Contract;
+
+function toWei(amount: number) {
+  return BigNumber.from(amount).mul(BigNumber.from(10).pow(18));
+}
+
+const DOLLLAR_BEACH_DROP_RATE = BigNumber.from(152_788_388_082_506);
 
 describe("Beach NFT", function () {
   // *** ERC721 / Minting ***
@@ -195,7 +204,7 @@ describe("Beach NFT", function () {
 
     this.timeout(75000);
 
-    await mintMany(137, await multiSigOwner.getAddress(), beachNFT137);
+    // await mintMany(137, await multiSigOwner.getAddress(), beachNFT137);
     // await mintMany(317, await multiSigOwner.getAddress(), beachNFT317);
     // await mintMany(713, await multiSigOwner.getAddress(), beachNFT713);
   });
@@ -475,6 +484,189 @@ describe("Beach NFT", function () {
       expect(
         await beachNFTMint.balanceOf(await address1.getAddress())
       ).to.equal(1);
+    });
+  });
+
+  describe.only("$BEACH ERC20", function () {
+    // **** ERC20 ****
+    //
+    // [ ] Should have a MAX SUPPLY of 1,000,000
+    // [ ] Should have a name of BEACH
+    //
+    // **** STAKING ****
+    //
+    // [ ] Should have a whitelist for tokens to stake
+    // [ ] Whitelist should be updateable by owner (add, remove, clear)
+    // [ ] Should have a staking rewards calculated based off of blocks elapsed
+    // [ ] Should have a staking "reward rate" per whitelisted token (struct?)
+    // [ ] Reward rate should be updateable
+    // [ ] Claiming rewards should reset block
+    //
+    // **** CURRENCY ****
+    //
+    // [ ] Should be able to transfer
+    // [ ] Should be pausable
+    // [ ]
+
+    beforeEach(async function () {
+      DollarBeach = await ethers.getContractFactory("BeachToken");
+      dollarBeach = await DollarBeach.deploy();
+      await dollarBeach.deployed();
+      await dollarBeach.transferOwnership(await multiSigOwner.getAddress());
+      await dollarBeach
+        .connect(multiSigOwner)
+        .modifyCreedAllowList(
+          beachNFT.address,
+          "BEACH",
+          DOLLLAR_BEACH_DROP_RATE,
+          true
+        );
+    });
+
+    describe("Basic tests", async function () {
+      it("Should be an ERC20 token", async function () {
+        expect(await dollarBeach.name()).to.equal("$B34CH Life Currency");
+        expect(await dollarBeach.symbol()).to.equal("$BEACH");
+      });
+
+      it("Contract should have a balance of 1000000", async function () {
+        expect(await dollarBeach.balanceOf(dollarBeach.address)).to.equal(
+          toWei(1_000_000)
+        );
+      });
+
+      it("Should have a total supply of 1000000", async function () {
+        expect(await dollarBeach.totalSupply()).to.equal(toWei(1_000_000));
+      });
+
+      it("Should have 18 decimals", async function () {
+        expect(await dollarBeach.decimals()).to.equal(18);
+      });
+    });
+
+    describe.only("Staking", async function () {
+      let token0: any;
+      const MOVE_BY_X_BLOCKS = 2;
+
+      beforeEach(async function () {
+        // Mint 1 NFT
+        await beachNFT.connect(address2).gimmeBeaches(1);
+
+        // Approve staking contract
+        await beachNFT
+          .connect(address2)
+          .setApprovalForAll(dollarBeach.address, true);
+
+        // Get the first NFT that got minted
+        token0 = await beachNFT.tokenOfOwnerByIndex(
+          await address2.getAddress(),
+          0
+        );
+
+        // Stake the one token
+        await dollarBeach.connect(address2).stake(beachNFT.address, token0);
+
+        // Wait (pass) 2 blocks
+        await advanceBlocks(MOVE_BY_X_BLOCKS);
+      });
+
+      //
+      // ******* Staking *******
+      //
+      // [x] Allows minting, approving staking contract and staking 1 NFT
+      // [x] Accrues rewards at each block
+      // [x] Freezes balance when claiming
+      // [x] Maintains correct balances when I freeze balances
+      // [x] Can claim accurate amount
+      // [ ] Can unstake
+      //
+      // ******* Partnership Staking *******
+      //
+      // [ ] Should enable staking for partner staking (LobsterMock)
+      // [ ] Should accrue at the right rate
+      // [ ] Should enable claiming and unstaking
+      //
+      it("Should allow staking one NFT, transfers and starts staking properly", async function () {
+        const stakingIds = await dollarBeach
+          .connect(address2)
+          .getMyStakingIds();
+        expect(stakingIds, "StakingIds should be of size 1").to.be.of.length(1);
+      });
+
+      it("Should accrue rewards at each block 1", async function () {
+        const balance = BigNumber.from(
+          await dollarBeach.connect(address2).getMyStakingBalance()
+        );
+        const expectedBalance = DOLLLAR_BEACH_DROP_RATE.mul(MOVE_BY_X_BLOCKS);
+        expect(
+          balance,
+          `Should equal ${MOVE_BY_X_BLOCKS} blocks value`
+        ).to.equal(expectedBalance);
+      });
+
+      it("Should accrue rewards at each block 2", async function () {
+        const balance = BigNumber.from(
+          await dollarBeach.connect(address2).getMyStakingBalance()
+        );
+        const expectedBalance = DOLLLAR_BEACH_DROP_RATE.mul(MOVE_BY_X_BLOCKS);
+        expect(
+          balance,
+          `Should equal ${MOVE_BY_X_BLOCKS} blocks value`
+        ).to.equal(expectedBalance);
+      });
+
+      it("Should claim, freeze balance and transfer the right amount", async function () {
+        await dollarBeach.connect(address2).claimAll(false); // Creates new block
+        const ClaimableBalance = await dollarBeach
+          .connect(address2)
+          .getMyStakingBalance();
+        expect(
+          ClaimableBalance,
+          `Claimable amount should equal 0 as it was all transferred`
+        ).to.equal(0);
+        const accountBalance = BigNumber.from(
+          await dollarBeach.balanceOf(await address2.getAddress())
+        );
+        const expectedDropClaimed = DOLLLAR_BEACH_DROP_RATE.mul(
+          MOVE_BY_X_BLOCKS + 1
+        );
+        expect(
+          expectedDropClaimed.eq(accountBalance),
+          `Should equal ${MOVE_BY_X_BLOCKS + 1} blocks value`
+        ).to.equal(true);
+      });
+
+      it("Should accumulate right balance after claiming", async function () {
+        await dollarBeach.connect(address2).claimAll(false); // Creates new block
+        await advanceBlocks(2); // Creates new block
+        const expectedClaimable = DOLLLAR_BEACH_DROP_RATE.mul(2);
+        const ClaimableBalance = BigNumber.from(
+          await dollarBeach.connect(address2).getMyStakingBalance()
+        );
+        expect(
+          ClaimableBalance.eq(expectedClaimable),
+          `Claimable amount should equal 2 blocks value`
+        ).to.equal(true);
+      });
+
+      it("Should unstake correctly", async function () {
+        // Unstake one token
+        await dollarBeach.connect(address2).unstakeAll(); // Create new block
+
+        const NFTbalance = await beachNFT.balanceOf(
+          await address2.getAddress()
+        );
+
+        expect(
+          await beachNFT.ownerOf(token0),
+          "Address2 should own the NFT"
+        ).to.equal(await address2.getAddress());
+
+        expect(
+          NFTbalance,
+          `Should have an NFT balance of 1 as it got token back`
+        ).to.equal(1);
+      });
     });
   });
 });
