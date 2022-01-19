@@ -12,11 +12,11 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 /// @custom:security-contact nemb@hey.com
-contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable {
+contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable {
 
-  uint public MAX_SUPPLY = 1_000_000;
+  uint public MAX_SUPPLY = 5_000_000;
   uint public MAX_STAKING = 30;
-  uint public DROP_RATE = 152_788_388_082_506; // (1/6545)*10e18
+  uint public DROP_RATE = 152_788_388_082_506 * 5; // (1/6545)*10e18*5
 
   event CreedAllowListUpdated(address creed, string name, uint rate, bool allowed);
   event ClaimedBalance(address holder, uint amount);
@@ -59,7 +59,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
   // Creeds
   mapping(address => Creed) private _creedAllowList;
 
-  constructor() ERC20("$B34CH Life Currency", "$BEACH") {
+  constructor() ERC20("B34CH Life Currency", "SEAFOOD") {
     _mint(address(this), MAX_SUPPLY * 10 ** decimals());
   }
 
@@ -69,6 +69,20 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
 
   function unpause() public onlyOwner {
     _unpause();
+  }
+
+  // Function aimed at governance to pay for grants or such
+  // Only callable by multi-sig wallet owning the contract
+  function spend(address to, uint256 amount) public onlyOwner {
+    _transfer(address(this), to, amount);
+  }
+
+  // Function aimed at governance
+  // Only callable by multi-sig wallet owning the contract
+  function increaseTotalSupply(uint256 amount) public onlyOwner {
+    uint256 additionalSupply = amount * 10 ** decimals();
+    _mint(address(this), additionalSupply);
+    MAX_SUPPLY = MAX_SUPPLY + additionalSupply;
   }
 
   function _beforeTokenTransfer(address from, address to, uint256 amount)
@@ -92,9 +106,9 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
   function stake(address creed_, uint tokenId_) public {
     uint[] memory myStakes_ = _getMyStakingInfo();
 
-    require(_creedAllowList[creed_].allowed == true, "$BEACH: This token is not allowed yet");
-    require(_getOwnerForCreedAndTokenId(creed_, tokenId_) == msg.sender, "$BEACH: You do not own this token");
-    require(myStakes_.length < MAX_STAKING, "$BEACH: You already have too many items staked");
+    require(_creedAllowList[creed_].allowed == true, "SEAFOOD: This token is not allowed yet");
+    require(_getOwnerForCreedAndTokenId(creed_, tokenId_) == msg.sender, "SEAFOOD: You do not own this token");
+    require(myStakes_.length < MAX_STAKING, "SEAFOOD: You already have too many items staked");
 
     _transferTokenFromOwner(creed_, tokenId_, msg.sender);
 
@@ -116,7 +130,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
   }
 
   function stakeByIds(address[] calldata creeds_, uint[] calldata tokensIds_) public {
-    require(tokensIds_.length == creeds_.length, "$BEACH: The amount of tokens and creeds are not equal");
+    require(tokensIds_.length == creeds_.length, "SEAFOOD: The amount of tokens and creeds are not equal");
     for (uint i = 0; i < tokensIds_.length; i++) {
       stake(creeds_[i], tokensIds_[i]);
     }
@@ -130,7 +144,6 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     Staking memory _staking = _stakings[stakingId_];
     address creed_ = _staking.creed;
     uint dropRate_ = _creedAllowList[creed_].rate;
-
 
     uint lastStakingBlock = _staking.endingBlock > 0 ? _staking.endingBlock : block.number;
     uint blocksSinceStaking = lastStakingBlock - _staking.startingBlock;
@@ -162,7 +175,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     _freezeBalance(msg.sender);
     uint balance = _balanceByOwner[msg.sender].claimableAmount;
 
-    require(balance > 0, "$BEACH: Nothing to claim");
+    require(balance > 0, "SEAFOOD: Nothing to claim");
 
     for (uint i = 0; i < myStakingsIds.length; i++) {
       uint stakingId_ = myStakingsIds[i];
@@ -191,7 +204,6 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     // Marking this Staking as fully reimbursed
     address _holder = _getOwnerForCreedAndTokenId(_stakings[stakingId].creed, _stakings[stakingId].tokenId);
 
-    // TODO: Verify the logic here
     _balanceByOwner[_holder].claimedAmount += _balanceByOwner[_holder].claimableAmount;
     _balanceByOwner[_holder].claimableAmount = 0;
 
@@ -211,7 +223,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
 
   function unstakeByCreedByTokenId(address creed, uint tokenId) public {
     address holder_ = _getOwnerForCreedAndTokenId(creed, tokenId);
-    require(holder_ == msg.sender, "$BEACH: You do not own this token");
+    require(holder_ == msg.sender, "SEAFOOD: You do not own this token");
     uint stakingId_ = _stakingByCreed[creed][tokenId];
     _unstakeByStakingId(stakingId_);
   }
@@ -226,7 +238,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
 
   function _unstakeByStakingId(uint stakingId) private {
     Staking memory staking_ = _stakings[stakingId];
-    require(staking_.owner == msg.sender, "$BEACH: You do not own this token");
+    require(staking_.owner == msg.sender, "SEAFOOD: You do not own this token");
 
     // Claim existing funds onto your wallet balance, ready to be transferred
     _freezeBalanceByStakingId(staking_.owner, stakingId);
@@ -269,7 +281,7 @@ contract BeachToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable 
     uint256 tokenId,
     bytes calldata data
   ) external override returns (bytes4) {
-    require(_creedAllowList[msg.sender].allowed == true, "$BEACH: This token is not allowed yet");
+    require(_creedAllowList[msg.sender].allowed == true, "SEAFOOD: This token is not allowed yet");
     return _onERC721ReceivedSelector;
   }
 }
