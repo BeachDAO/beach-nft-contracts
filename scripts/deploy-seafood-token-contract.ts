@@ -22,22 +22,22 @@ async function main() {
   const seafoodToken = await SeafoodToken.deploy();
 
   await seafoodToken.deployed();
-  console.log("Beach deployed to:", seafoodToken.address);
+  console.log("Seafood deployed to:", seafoodToken.address);
 
   let DAOAddress;
 
   switch (hre.network.name) {
     case "mainnet":
-      // TODO: Set the right address
-      DAOAddress = "0xA3546AE4B278C423033c85B6EE0A82BE2455fcc6";
+      DAOAddress = process.env.ADDRESSES_DAO_MAINNET;
       break;
     case "rinkeby":
     default:
-      DAOAddress = "0xA3546AE4B278C423033c85B6EE0A82BE2455fcc6";
+      DAOAddress = process.env.ADDRESSES_DAO_RINKEBY;
       break;
   }
 
-  // TODO: Transfer Ownership to DAO address
+  // TODO: add BEACH to the allowlist
+
   await seafoodToken.transferOwnership(DAOAddress);
 }
 

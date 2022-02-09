@@ -1,0 +1,13 @@
+output: mythx.json
+format: json
+
+analyze:
+  mode: deep
+  create-group: true
+  group-name: B34CH
+  solc: 0.8.4
+  remappings:
+    - "@openzeppelin/=/Users/nicolas/Documents/projects/NFT/ekris-beach-drop/node_modules/@openzeppelin/"
+  contracts:
+    - Beach
+    - SeafoodToken

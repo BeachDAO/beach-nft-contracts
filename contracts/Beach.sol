@@ -75,27 +75,26 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
   address private _lobster;
   address private _seafood;
 
-  uint mintBlock;
+  uint private mintBlock;
 
   struct BeachMetadata {
-    string[8] traits;
-    uint tokenId;
-    string image;
-    string image_large;
-    string name;
+    uint16[8] traits;
+    //    string image;
+    //    string image_large;
   }
 
-  string[] TRAITS = ["SAND", "WATER", "WAVES", "SPARKLING", "LOCATION", "FRAME", "FEATURE", "SIGN"];
+  string[] private TRAITS = ["SAND", "WATER", "WAVES", "SPARKLING", "LOCATION", "FRAME", "FEATURE", "SIGN"];
+  string[] private DICT;
 
-  mapping(uint256 => string) _beachNames;
-  mapping(uint256 => BeachMetadata) _beachMetadata;
-  mapping(string => bool) _existingNames;
-  uint AMOUNT_NEEDED_FOR_NAME_CHANGE = 50;
+  mapping(uint256 => string) private _beachNames;
+  mapping(uint256 => uint16[8]) private _beachMetadata;
+  mapping(string => bool) private _existingNames;
+  uint private AMOUNT_NEEDED_FOR_NAME_CHANGE = 50;
 
   mapping(address => uint8) private shares;
   mapping(address => uint256) private released;
   mapping(address => uint256) private balances;
-  address[] _payees;
+  address[] private _payees;
   uint256 private totalShares;
   uint256 private amountReleased;
 
@@ -131,21 +130,19 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
   {
     string memory metadataString;
 
-    BeachMetadata memory beachMetadata = _beachMetadata[_tokenId];
-
-    for (uint8 i = 0; i < beachMetadata.traits.length; i++) {
+    for (uint8 i = 0; i < _beachMetadata[_tokenId].length; i++) {
       metadataString = string(
         abi.encodePacked(
           metadataString,
           '{"trait_type":"',
           TRAITS[i],
           '","value":"',
-          beachMetadata.traits[i],
+          DICT[_beachMetadata[_tokenId][i]],
           '"}'
         )
       );
 
-      if (i < beachMetadata.traits.length - 1)
+      if (i < _beachMetadata[_tokenId].length - 1)
         metadataString = string(abi.encodePacked(metadataString, ","));
     }
 
@@ -164,8 +161,6 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
   {
     require(_tokenId >= 0 && _tokenId < MAX_SUPPLY, "$BEACH: TokenID does not exist");
 
-    BeachMetadata memory beachMetadata = _beachMetadata[_tokenId];
-
     return
     string(
       abi.encodePacked(
@@ -178,8 +173,8 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
                 '"description": "BEACH", ',
                 '"token_id": ', Strings.toString(_tokenId), ', ',
                 '"art_number": ', Strings.toString(_tokenId + 1), ', ',
-                _revealed ? abi.encodePacked('"image": "ipfs://', beachMetadata.image, '",') : abi.encodePacked('"image": "ipfs://', _placeholderURI, '",'),
-                _revealed ? abi.encodePacked('"image_large": "ipfs://', beachMetadata.image_large, '",') : abi.encodePacked('"image": "ipfs://', _placeholderURI, '",'),
+                _revealed ? abi.encodePacked('"image": "ipfs://', /*beachMetadata.image*/'', '",') : abi.encodePacked('"image": "ipfs://', _placeholderURI, '",'),
+                _revealed ? abi.encodePacked('"image_large": "ipfs://', /*beachMetadata.image_large*/ '', '",') : abi.encodePacked('"image": "ipfs://', _placeholderURI, '",'),
                 '"attributes":',
                 _revealed ? hashToMetadata(_tokenId) : '[]',
                 "}"
@@ -192,14 +187,19 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
   }
 
   modifier mintOpened() {
-    require(block.number > mintBlock, "BEACH: Mint block is not ready yet");
+    require(block.number > mintBlock, "BEACH: Mint block not ready");
+    _;
+  }
+
+  modifier revealedStatus(bool revealStatus) {
+    require(_revealed == revealStatus, string(abi.encodePacked("BEACH: REVEAL status is not ", revealStatus ? "TRUE" : "FALSE")));
     _;
   }
 
   function gimmeBeaches(uint8 count) external payable mintOpened {
-    require(count <= 5, "GetABeach: You can get MAX 5 beaches at once.");
-    require(balanceOf(_msgSender()) < 10, "GetABeach: Too many beaches in the wallet.");
-    require(msg.value == getMyPriceForNextMint(), "GetABeach: The minting amount is incorrect");
+    require(count <= 5, "GetABeach: MAX 5 beaches at once");
+    require(balanceOf(_msgSender() + count) < 10, "Beach: Too many beaches");
+    require(msg.value == getMyPriceForNextMint(), "Beach: Minting amount incorrect");
 
     // Split amount received
     _split(msg.value);
@@ -247,7 +247,6 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
       _existingNames[_beachNames[tokenId_]] = false;
     }
     _beachNames[tokenId_] = name_;
-    _beachMetadata[tokenId_].name = name_;
     _existingNames[toLower(name_)] = true;
     emit NameChanged(name_);
   }
@@ -324,7 +323,7 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
 
   function _burnBeachToken(uint amount_) private returns (bool) {
     uint __amount = _toFullDecimals(amount_);
-    require(resolveBeachBalance(_msgSender()) >= __amount, "BEACH: Not enough $BEACH balance to burn the requested amount");
+    require(resolveBeachBalance(_msgSender()) >= __amount, "BEACH: Not enough $BEACH balance to burn");
     IERC20Burnable(_seafood).burnFrom(_msgSender(), __amount);
     return true;
   }
@@ -355,27 +354,31 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
    *      Reveal / Mint      *
    ***************************/
 
-  function setMetadata(uint[] calldata tokenIds, string[][] calldata metadata) public onlyOwner returns (bool) {
-    for (uint i = 0; i < tokenIds.length; i++) {
-      uint256 tokenId_ = tokenIds[i];
-      string[8] memory traits = [
-      metadata[i][0], // Properties.TRAITS_SAND
-      metadata[i][1], // Properties.TRAITS_WATER
-      metadata[i][2], // Properties.TRAITS_WAVES
-      metadata[i][3], // Properties.TRAITS_SPARKLING
-      metadata[i][4], // Properties.TRAITS_LOCATION
-      metadata[i][5], // Properties.TRAITS_FRAME
-      metadata[i][6], // Properties.TRAITS_FEATURE
-      metadata[i][7]  // Properties.TRAITS_SIGN
-      ];
+  function setDict(string[] memory dict) public onlyOwner revealedStatus(false) {
+    DICT = dict;
+  }
 
-      _beachMetadata[tokenId_] = BeachMetadata(
-        traits,
-        tokenId_,
-        metadata[i][8], // Properties.IMAGE
-        metadata[i][9], // Properties.IMAGE_LARGE
-        string(abi.encodePacked("Beach #", Strings.toString(tokenId_)))
-      );
+  function setMetadata(uint16[2] calldata range, uint16[][] calldata metadata) external onlyOwner returns (bool) {
+    require(range[0] >= 0 && range[0] < range[1] && range[1] <= MAX_SUPPLY, "BEACH: Range incorrect");
+    for (uint i = 0; i < range[1] - range[0]; i++) {
+      uint tokenId_ = i + range[0];
+
+      // Properties.TRAITS_SAND
+      _beachMetadata[tokenId_][0] = metadata[i][0];
+      // Properties.TRAITS_WATER
+      _beachMetadata[tokenId_][1] = metadata[i][1];
+      // Properties.TRAITS_WAVES
+      _beachMetadata[tokenId_][2] = metadata[i][2];
+      // Properties.TRAITS_SPARKLING
+      _beachMetadata[tokenId_][3] = metadata[i][3];
+      // Properties.TRAITS_LOCATION
+      _beachMetadata[tokenId_][4] = metadata[i][4];
+      // Properties.TRAITS_FRAME
+      _beachMetadata[tokenId_][5] = metadata[i][5];
+      // Properties.TRAITS_FEATURE
+      _beachMetadata[tokenId_][6] = metadata[i][6];
+      // Properties.TRAITS_SIGN
+      _beachMetadata[tokenId_][7] = metadata[i][7];
     }
 
     return true;

@@ -73,13 +73,13 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
 
   // Function aimed at governance to pay for grants or such
   // Only callable by multi-sig wallet owning the contract
-  function spend(address to, uint256 amount) public onlyOwner {
+  function spend(address to, uint256 amount) external onlyOwner {
     _transfer(address(this), to, amount);
   }
 
   // Function aimed at governance
   // Only callable by multi-sig wallet owning the contract
-  function increaseTotalSupply(uint256 amount) public onlyOwner {
+  function increaseTotalSupply(uint256 amount) external onlyOwner {
     uint256 additionalSupply = amount * 10 ** decimals();
     _mint(address(this), additionalSupply);
     MAX_SUPPLY = MAX_SUPPLY + additionalSupply;
@@ -126,6 +126,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     // TokenId by creed
     _stakingByCreed[creed_][tokenId_] = stakingId;
     // Adding to sender IDs
+    // TODO: Remove when unstaking
     _stakingsByOwner[msg.sender].push(stakingId);
   }
 
@@ -169,7 +170,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     return balance;
   }
 
-  function claimAll(bool close) public {
+  function claimAll(bool close) external {
     uint[] memory myStakingsIds = _getMyStakingInfo();
 
     _freezeBalance(msg.sender);
@@ -221,14 +222,14 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     return currentHolder;
   }
 
-  function unstakeByCreedByTokenId(address creed, uint tokenId) public {
+  function unstakeByCreedByTokenId(address creed, uint tokenId) external {
     address holder_ = _getOwnerForCreedAndTokenId(creed, tokenId);
     require(holder_ == msg.sender, "SEAFOOD: You do not own this token");
     uint stakingId_ = _stakingByCreed[creed][tokenId];
     _unstakeByStakingId(stakingId_);
   }
 
-  function unstakeAll() public {
+  function unstakeAll() external {
     uint[] memory myStakings_ = _getMyStakingInfo();
 
     for (uint i = 0; i < myStakings_.length; i++) {
@@ -255,7 +256,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     IERC721(creed_).safeTransferFrom(owner_, address(this), tokenId_);
   }
 
-  function returnTokensToOwners(uint[] calldata stakingIds_) public onlyOwner {
+  function returnTokensToOwners(uint[] calldata stakingIds_) external onlyOwner {
     for (uint i = 0; i < stakingIds_.length; i++) {
       address creed_ = _stakings[stakingIds_[i]].creed;
       uint tokenId_ = _stakings[stakingIds_[i]].tokenId;
@@ -265,7 +266,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     }
   }
 
-  function modifyCreedAllowList(address creed_, string calldata name_, uint rate_, bool allowed_) public onlyOwner {
+  function modifyCreedAllowList(address creed_, string calldata name_, uint rate_, bool allowed_) external onlyOwner {
     _modifyCreedAllowList(creed_, name_, rate_, allowed_);
   }
 
