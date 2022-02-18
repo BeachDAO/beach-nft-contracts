@@ -47,11 +47,14 @@ pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Royalty.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
+
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 import "./BeachLibrary.sol";
 
@@ -63,49 +66,50 @@ interface ISeafood {
   function decimals() external view returns (uint8);
 }
 
-contract Beach is ERC721, ERC721Enumerable, Ownable {
+contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   uint private _tokenIdCounter = 0;
-  uint public MAX_SUPPLY = 1337;
-
   bool private _revealed = false;
   string private _baseURIPath = "https://lobby.mypinata.cloud/ipfs/";
   string private _placeholderURI = "QmZc5HkKqUf1UiL9xqpanvbETB83Ter21AqMRUo1mbv9PN";
-  string private _revealedPath = "nope";
+  string[2] private _revealedPath = ["", ""];
+  bool private _freezeBasePath = false;
+
+  // TODO: Add the waveListMerkleRoot
+  bytes32 public waveListMerkleRoot = "";
+  uint public MAX_SUPPLY = 1337;
+  string public provenance = "";
 
   address private _lobster;
   address private _seafood;
 
-  uint private mintBlock;
+  uint private _mintBlock;
 
-  struct BeachMetadata {
-    uint16[8] traits;
-    //    string image;
-    //    string image_large;
-  }
-
-  string[] private TRAITS = ["SAND", "WATER", "WAVES", "SPARKLING", "LOCATION", "FRAME", "FEATURE", "SIGN"];
-  string[] private DICT;
+  string[] private _TRAITS = ["SAND", "WATER", "WAVES", "SPARKLING", "LOCATION", "FRAME", "FEATURE", "SIGN"];
+  string[] private _DICT;
 
   mapping(uint256 => string) private _beachNames;
   mapping(uint256 => uint16[8]) private _beachMetadata;
   mapping(string => bool) private _existingNames;
+
   uint private AMOUNT_NEEDED_FOR_NAME_CHANGE = 50;
 
-  mapping(address => uint8) private shares;
-  mapping(address => uint256) private released;
-  mapping(address => uint256) private balances;
+  mapping(address => uint8) private _shares;
+  mapping(address => uint256) private _released;
+  mapping(address => uint256) private _balances;
   address[] private _payees;
-  uint256 private totalShares;
-  uint256 private amountReleased;
+  uint256 private _totalShares;
+  uint256 private _totalSplit;
+  uint256 private _amountReleased;
 
-  event PayeeAdded(address account, uint8 shares_);
+  event PayeeAdded(address account, uint8 shares);
+  event PayeeUpdated(address account, uint8 shares);
   event PaymentReleased(address account, uint256 amount);
   event NFTMinted(uint256 tokenId, address mintedBy);
   event Revealed();
-  event PathUpdated(string path_);
-  event NameChanged(string name_);
+  event PathUpdated(string path);
+  event NameChanged(string name);
 
-  constructor(address lobster_, address seafood_, address[] memory accounts_, uint8[] memory shares_, uint blocksBeforeTheMint) ERC721("Beach", "BEACH-NFT") {
+  constructor(address lobster_, address seafood_, address[] memory accounts_, uint8[] memory shares_, uint blocksBeforeTheMint_) ERC721("Beach", "BEACH-NFT") {
     _lobster = lobster_;
     _seafood = seafood_;
 
@@ -113,53 +117,106 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
       _addPayee(accounts_[i], shares_[i]);
     }
 
-    mintBlock = block.number + blocksBeforeTheMint;
+    _setDefaultRoyalty(address(this), 1000);
+
+    _mintBlock = block.number + blocksBeforeTheMint_;
+  }
+
+  function setSeafood(address seafood_) external onlyOwner {
+    _seafood = seafood_;
+  }
+
+  receive() external payable {
+  }
+
+  /**
+   * @dev Returns the wallet of a given wallet. Mainly for ease for frontend devs.
+   * @param _wallet The wallet to get the tokens of.
+   */
+  function walletOfOwner(address wallet_)
+  public
+  view
+  returns (uint256[] memory)
+  {
+    uint256 tokenCount = balanceOf(wallet_);
+
+    uint256[] memory tokensId = new uint256[](tokenCount);
+    for (uint256 i; i < tokenCount; i++) {
+      tokensId[i] = tokenOfOwnerByIndex(wallet_, i);
+    }
+    return tokensId;
   }
 
   function _baseURI() internal view override returns (string memory) {
     return _baseURIPath;
   }
 
+  modifier pathNotFrozen() {
+    require(!_freezeBasePath, "BEACH: Base Path frozen");
+    _;
+  }
+
+  function _updateBaseURI(string memory uri_) private pathNotFrozen {
+    _baseURIPath = uri_;
+  }
+
+  // Function intended to be triggered by the DAO in case the Gateway or Network has an issue
+  function updateBaseURI(string memory uri_) external onlyOwner {
+    _updateBaseURI(uri_);
+  }
+
+  function freezeBasePath() external onlyOwner pathNotFrozen {
+    _freezeBasePath = true;
+  }
+
+  function getRevealedPath(uint256 tokenId_) public view returns (string memory) {
+    return tokenId_ < 1000 ? _revealedPath[0] : _revealedPath[1];
+  }
+
   /**
    * @dev Hash to metadata function
    */
-  function hashToMetadata(uint _tokenId)
+  function hashToMetadata(uint tokenId_)
   public
   view
   returns (string memory)
   {
     string memory metadataString;
 
-    for (uint8 i = 0; i < _beachMetadata[_tokenId].length; i++) {
+    for (uint8 i = 0; i < _beachMetadata[tokenId_].length; i++) {
       metadataString = string(
         abi.encodePacked(
           metadataString,
           '{"trait_type":"',
-          TRAITS[i],
+          _TRAITS[i],
           '","value":"',
-          DICT[_beachMetadata[_tokenId][i]],
+          _DICT[_beachMetadata[tokenId_][i]],
           '"}'
         )
       );
 
-      if (i < _beachMetadata[_tokenId].length - 1)
+      if (i < _beachMetadata[tokenId_].length - 1)
         metadataString = string(abi.encodePacked(metadataString, ","));
     }
 
     return string(abi.encodePacked("[", metadataString, "]"));
   }
 
+  function contractURI() public view returns (string memory) {
+    return "https://metadata-url.com/my-metadata";
+  }
+
   /**
    * @dev Returns the metadata for a token Id
    * @param _tokenId The tokenId to return the metadata for.
    */
-  function tokenURI(uint256 _tokenId)
+  function tokenURI(uint256 tokenId_)
   public
   view
   override
   returns (string memory)
   {
-    require(_tokenId >= 0 && _tokenId < MAX_SUPPLY, "$BEACH: TokenID does not exist");
+    require(tokenId_ >= 0 && tokenId_ < MAX_SUPPLY, "$BEACH: TokenID does not exist");
 
     return
     string(
@@ -169,14 +226,14 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
           bytes(
             string(
               abi.encodePacked(
-                abi.encodePacked('{"name": "', beachName(_tokenId), '",'),
+                abi.encodePacked('{"name": "', beachName(tokenId_), '",'),
                 '"description": "BEACH", ',
-                '"token_id": ', Strings.toString(_tokenId), ', ',
-                '"art_number": ', Strings.toString(_tokenId + 1), ', ',
-                _revealed ? abi.encodePacked('"image": "ipfs://', /*beachMetadata.image*/'', '",') : abi.encodePacked('"image": "ipfs://', _placeholderURI, '",'),
-                _revealed ? abi.encodePacked('"image_large": "ipfs://', /*beachMetadata.image_large*/ '', '",') : abi.encodePacked('"image": "ipfs://', _placeholderURI, '",'),
+                '"token_id": ', Strings.toString(tokenId_), ', ',
+                '"art_number": ', Strings.toString(tokenId_ + 1), ', ',
+                _revealed ? abi.encodePacked('"image": "', _baseURI(), getRevealedPath(tokenId_), '/', tokenId_, '.png",') : abi.encodePacked('"image": "', _baseURI(), _placeholderURI, '",'),
+                _revealed ? abi.encodePacked('"image": "', _baseURI(), getRevealedPath(tokenId_), '/', tokenId_, '_large.png",') : abi.encodePacked('"image": "', _baseURI(), _placeholderURI, '",'),
                 '"attributes":',
-                _revealed ? hashToMetadata(_tokenId) : '[]',
+                _revealed ? hashToMetadata(tokenId_) : '[]',
                 "}"
               )
             )
@@ -187,24 +244,26 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
   }
 
   modifier mintOpened() {
-    require(block.number > mintBlock, "BEACH: Mint block not ready");
+    require(block.number > _mintBlock, "BEACH: Mint block not ready");
     _;
   }
 
-  modifier revealedStatus(bool revealStatus) {
+  modifier revealedStatus(bool revealStatus_) {
     require(_revealed == revealStatus, string(abi.encodePacked("BEACH: REVEAL status is not ", revealStatus ? "TRUE" : "FALSE")));
     _;
   }
 
-  function gimmeBeaches(uint8 count) external payable mintOpened {
-    require(count <= 5, "GetABeach: MAX 5 beaches at once");
-    require(balanceOf(_msgSender() + count) < 10, "Beach: Too many beaches");
-    require(msg.value == getMyPriceForNextMint(), "Beach: Minting amount incorrect");
+  function gimmeBeaches(uint8 count_, bool isWaveList_, bytes32[] calldata merkleProof_) external payable mintOpened {
+    require(count_ <= 5, "GetABeach: MAX 5 beaches at once");
+    require(balanceOf(_msgSender()) + count_ < 10, "Beach: Too many beaches");
 
-    // Split amount received
-    _split(msg.value);
+    if (isWaveList_) {
+      require(MerkleProof.verify(merkleProof_, waveListMerkleRoot, keccak256(abi.encodePacked(_msgSender()))), "BEACH: Not found in waveList");
+    }
 
-    for (uint8 i = 0; i < count; i++) {
+    require(msg.value == getMyPriceForNextMint(isWaveList_), "Beach: Minting amount incorrect");
+
+    for (uint8 i = 0; i < count_; i++) {
       _mintABeach(_msgSender());
     }
   }
@@ -235,10 +294,10 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
     require(owner == _msgSender(), "BEACH: You do not own this token");
     require(validateName(name_), "BEACH: Name is not valid");
     require(nameExists(name_) == false, "BEACH: Name requested is already used, please chose another");
-    require(resolveBeachBalance(_msgSender()) > AMOUNT_NEEDED_FOR_NAME_CHANGE, "BEACH: You do not have enough $BEACH balance to change the name");
+    require(resolveSeafoodBalance(_msgSender()) > AMOUNT_NEEDED_FOR_NAME_CHANGE, "BEACH: You do not have enough $BEACH balance to change the name");
 
     // Burn $BEACH
-    _burnBeachToken(AMOUNT_NEEDED_FOR_NAME_CHANGE);
+    _burnSeafoodToken(AMOUNT_NEEDED_FOR_NAME_CHANGE);
     _setName(tokenId_, name_);
   }
 
@@ -276,7 +335,7 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
       bytes1 char = b[i];
 
       if (char == 0x20 && lastChar == 0x20) return false;
-      // Cannot contain continous spaces
+      // Cannot contain continuous spaces
 
       if (
         !(char >= 0x30 && char <= 0x39) && //9-0
@@ -310,9 +369,9 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
   }
 
   /**
-   * $BEACH management
+   * $SEAFOOD management
    */
-  function resolveBeachBalance(address account) internal view returns (uint) {
+  function resolveSeafoodBalance(address account) internal view returns (uint) {
     return IERC20(_seafood).balanceOf(account);
   }
 
@@ -321,16 +380,16 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
     return amount_ * 10 ** ISeafood(_seafood).decimals();
   }
 
-  function _burnBeachToken(uint amount_) private returns (bool) {
+  function _burnSeafoodToken(uint amount_) private returns (bool) {
     uint __amount = _toFullDecimals(amount_);
-    require(resolveBeachBalance(_msgSender()) >= __amount, "BEACH: Not enough $BEACH balance to burn");
+    require(resolveSeafoodBalance(_msgSender()) >= __amount, "BEACH: Not enough $BEACH balance to burn");
     IERC20Burnable(_seafood).burnFrom(_msgSender(), __amount);
     return true;
   }
 
   // The following functions are overrides required by Solidity.
 
-  function _burn(uint256 tokenId) internal override(ERC721) {}
+  function _burn(uint256 tokenId) internal override(ERC721, ERC721Royalty) {}
 
   function _beforeTokenTransfer(address from, address to, uint256 tokenId)
   internal
@@ -342,7 +401,7 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
   function supportsInterface(bytes4 interfaceId)
   public
   view
-  override(ERC721, ERC721Enumerable)
+  override(ERC721, ERC721Enumerable, ERC721Royalty)
   returns (bool)
   {
     return super.supportsInterface(interfaceId);
@@ -355,7 +414,7 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
    ***************************/
 
   function setDict(string[] memory dict) public onlyOwner revealedStatus(false) {
-    DICT = dict;
+    _DICT = dict;
   }
 
   function setMetadata(uint16[2] calldata range, uint16[][] calldata metadata) external onlyOwner returns (bool) {
@@ -388,19 +447,12 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
     return _revealed;
   }
 
-  function reveal() public onlyOwner {
+  function reveal(string[] calldata paths) external onlyOwner {
     require(_revealed == false, "BEACH: _revealed already set");
     _revealed = true;
+    _revealedPath[0] = paths[0];
+    _revealedPath[1] = paths[1];
     emit Revealed();
-  }
-
-  function _updateBaseURI(string memory uri_) private {
-    _baseURIPath = uri_;
-  }
-
-  // Function intended to be triggered by the DAO in case the Gateway or Network has an issue
-  function updateBaseURI(string memory uri_) public onlyOwner {
-    _updateBaseURI(uri_);
   }
 
   function currentTokenId() public view returns (uint) {
@@ -411,16 +463,16 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
     return IERC721(_lobster).balanceOf(target);
   }
 
-  function getMyPriceForNextMint() public view returns (uint) {
+  function getMyPriceForNextMint(bool isWaveList_) public view returns (uint) {
     uint lobsterBalance = resolveLobster(_msgSender());
 
     if (_tokenIdCounter < 137) {
-      if (lobsterBalance >= 1) {
+      if (lobsterBalance >= 1 || isWaveList_) {
         return 0 ether;
       }
       return 1 ether;
     } else if (_tokenIdCounter >= 137 && _tokenIdCounter < 317) {
-      if (lobsterBalance >= 1) {
+      if (lobsterBalance >= 1 || isWaveList_) {
         return 0.037 ether;
       }
       return 0.073 ether;
@@ -443,52 +495,104 @@ contract Beach is ERC721, ERC721Enumerable, Ownable {
    *    Payment Splitter    *
    **************************/
 
-  function _addPayee(address account, uint8 shares_) private {
-    require(account != address(0), "PaymentSplitter: Address can't be 0");
+  function _addPayee(address account_, uint8 shares_) private {
+    require(account_ != address(0), "PaymentSplitter: Address can't be 0");
     require(shares_ > 0, "PaymentSplitter: Shares can't be 0");
-    require(shares[account] == 0, "PaymentSplitter: Account already has shares");
-    require(released[account] == 0, "PaymentSplitter: Released is non-0 for this account");
-    require(balances[account] == 0, "PaymentSplitter: Balances is non-0 for this account");
-    require(_payees.length < 256, "PaymentSplitter: There are too many shareholders");
+    require(_totalShares + shares_ < 256, "PaymentSplitter: Max shares reached");
+    require(_shares[account_] == 0, "PaymentSplitter: Account already has shares");
+    require(_released[account_] == 0, "PaymentSplitter: Released is non-0 for this account");
+    require(_balances[account_] == 0, "PaymentSplitter: Balances is non-0 for this account");
+    require(_payees.length < 256, "PaymentSplitter: Too many shareholders");
 
-    _payees.push(account);
-    shares[account] = shares_;
-    released[account] = 0;
-    balances[account] = 0;
-    totalShares += shares_;
+    _payees.push(account_);
+    _shares[account_] = shares_;
+    _released[account_] = 0;
+    _balances[account_] = 0;
+    _totalShares += shares_;
 
-    emit PayeeAdded(account, shares_);
+    emit PayeeAdded(account_, shares_);
+  }
+
+  function addPayee(address account_, uint8 shares_) external onlyOwner {
+    _addPayee(account_, shares_);
+  }
+
+  function addPayeesBatch(address[] calldata accounts_, uint8[] calldata shares_) external onlyOwner {
+    for (uint8 i = 0; i < accounts_.length; i++) {
+      _addPayee(account_[i], shares_[i]);
+    }
+  }
+
+  function _updatePayee(address account_, uint8 shares_) private {
+    require(account_ != address(0), "PaymentSplitter: Address can't be 0");
+    require(_released[account_] > 0 || _balances[account_] > 0, "PaymentSplitter: Account doesn't exist");
+    require(_totalShares - _shares[account_] + shares_ < 256, "PaymentSplitter: Max shares reached");
+
+    uint8 sharesBefore = _shares[account_];
+
+    // Update shares
+    _shares[account_] = shares_;
+
+    // Adjust total shares
+    _totalShares = _totalShares - sharesBefore + shares_;
+
+    emit PayeeUpdated(account_, shares_);
+  }
+
+  function updatePayee(address account_, uint8 shares_) external onlyOwner {
+    _updatePayee(account_, shares_);
+  }
+
+  function updatePayeesBatch(address[] calldata accounts_, uint8[] calldata shares_) external onlyOwner {
+    for (uint8 i = 0; i < accounts_.length; i++) {
+      _updatePayee(account_[i], shares_[i]);
+    }
   }
 
   function _split(uint amount) private {
     for (uint8 i = 0; i < _payees.length; i++) {
-      uint256 amountSplit = amount * shares[_payees[i]] / totalShares;
-      balances[_payees[i]] = amountSplit;
+      // Only calculate if the shares are not 0 to avoid un-needed calculations
+      if (_shares[_payees[i]] > 0) {
+        uint256 amountSplit = amount * _shares[_payees[i]] / _totalShares;
+        _balances[_payees[i]] += amountSplit;
+        _totalSplit += amountSplit;
+      }
     }
   }
 
-  function release(address payable account) public onlyAccountOrOwner(account) {
-    require(balances[account] > 0, "PaymentSplitter: Account has no balance");
+  function _splitOutstandingBalance() internal {
+    uint outstandingBalance = address(this).balance - _totalSplit;
+    _split(outstandingBalance);
+  }
+
+  function split() external onlyAccountOrOwner {
+    _splitOutstandingBalance();
+  }
+
+  function release(address payable account) external onlyAccountOrOwner(account) {
+    require(_balances[account] > 0, "PaymentSplitter: Account has no balance");
+
+    _splitOutstandingBalance();
 
     // Non-re-entrant pre-tx
-    uint256 amountToSend = balances[account];
-    balances[account] = 0;
+    uint256 amountToSend = _balances[account];
+    _balances[account] = 0;
 
     Address.sendValue(account, amountToSend);
 
     // Post-tx book-keeping
-    released[account] = released[account] + amountToSend;
-    amountReleased = amountReleased + amountToSend;
+    _released[account] = _released[account] + amountToSend;
+    _amountReleased = _amountReleased + amountToSend;
 
     emit PaymentReleased(account, amountToSend);
   }
 
   function accountBalance(address account) public view onlyAccountOrOwner(account) returns (uint256) {
-    return balances[account];
+    return _balances[account];
   }
 
   function totalReceived() public view returns (uint256) {
-    return address(this).balance + amountReleased;
+    return address(this).balance + _amountReleased;
   }
 
   modifier onlyAccountOrOwner(address account) {

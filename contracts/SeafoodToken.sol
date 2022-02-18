@@ -58,6 +58,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
 
   // Creeds
   mapping(address => Creed) private _creedAllowList;
+  address[] _creedsAllowed;
 
   constructor() ERC20("B34CH Life Currency", "SEAFOOD") {
     _mint(address(this), MAX_SUPPLY * 10 ** decimals());
@@ -97,26 +98,24 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
    * **** STAKING ****
    */
 
-  function _reserveNextStakingId() private returns (uint) {
-    uint stakingId_ = _stakingId;
-    _stakingId += 1;
-    return stakingId_;
+  function _reserveNextStakingId() internal returns (uint) {
+    return _stakingId++;
   }
 
   function stake(address creed_, uint tokenId_) public {
     uint[] memory myStakes_ = _getMyStakingInfo();
 
     require(_creedAllowList[creed_].allowed == true, "SEAFOOD: This token is not allowed yet");
-    require(_getOwnerForCreedAndTokenId(creed_, tokenId_) == msg.sender, "SEAFOOD: You do not own this token");
+    require(_getOwnerForCreedAndTokenId(creed_, tokenId_) == _msgSender(), "SEAFOOD: You do not own this token");
     require(myStakes_.length < MAX_STAKING, "SEAFOOD: You already have too many items staked");
 
-    _transferTokenFromOwner(creed_, tokenId_, msg.sender);
+    _transferTokenFromOwner(creed_, tokenId_, _msgSender());
 
     // Breaking init into multiple statements to optimize for gas
     Staking memory staking;
     staking.tokenId = tokenId_;
     staking.creed = creed_;
-    staking.owner = msg.sender;
+    staking.owner = _msgSender();
     staking.startingBlock = block.number;
     staking.claimedAmount = 0;
 
@@ -127,7 +126,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     _stakingByCreed[creed_][tokenId_] = stakingId;
     // Adding to sender IDs
     // TODO: Remove when unstaking
-    _stakingsByOwner[msg.sender].push(stakingId);
+    _stakingsByOwner[_msgSender()].push(stakingId);
   }
 
   function stakeByIds(address[] calldata creeds_, uint[] calldata tokensIds_) public {
@@ -138,7 +137,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
   }
 
   function _getMyStakingInfo() private view returns (uint[] memory) {
-    return _stakingsByOwner[msg.sender];
+    return _stakingsByOwner[_msgSender()];
   }
 
   function _getBalanceForStakingId(uint stakingId_) private view returns (uint) {
@@ -165,7 +164,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
       balance += _getBalanceForStakingId(stakingIds[i]);
     }
 
-    balance += _balanceByOwner[msg.sender].claimableAmount;
+    balance += _balanceByOwner[_msgSender()].claimableAmount;
 
     return balance;
   }
@@ -173,8 +172,8 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
   function claimAll(bool close) external {
     uint[] memory myStakingsIds = _getMyStakingInfo();
 
-    _freezeBalance(msg.sender);
-    uint balance = _balanceByOwner[msg.sender].claimableAmount;
+    _freezeBalance(_msgSender());
+    uint balance = _balanceByOwner[_msgSender()].claimableAmount;
 
     require(balance > 0, "SEAFOOD: Nothing to claim");
 
@@ -183,9 +182,9 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
       _markAsClaimed(stakingId_, close);
     }
 
-    _transfer(address(this), msg.sender, balance);
+    _transfer(address(this), _msgSender(), balance);
 
-    emit ClaimedBalance(msg.sender, balance);
+    emit ClaimedBalance(_msgSender(), balance);
   }
 
   function _freezeBalanceByStakingId(address holder_, uint stakingId_) private {
@@ -224,7 +223,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
 
   function unstakeByCreedByTokenId(address creed, uint tokenId) external {
     address holder_ = _getOwnerForCreedAndTokenId(creed, tokenId);
-    require(holder_ == msg.sender, "SEAFOOD: You do not own this token");
+    require(holder_ == _msgSender(), "SEAFOOD: You do not own this token");
     uint stakingId_ = _stakingByCreed[creed][tokenId];
     _unstakeByStakingId(stakingId_);
   }
@@ -239,7 +238,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
 
   function _unstakeByStakingId(uint stakingId) private {
     Staking memory staking_ = _stakings[stakingId];
-    require(staking_.owner == msg.sender, "SEAFOOD: You do not own this token");
+    require(staking_.owner == _msgSender(), "SEAFOOD: You do not own this token");
 
     // Claim existing funds onto your wallet balance, ready to be transferred
     _freezeBalanceByStakingId(staking_.owner, stakingId);
@@ -266,11 +265,37 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     }
   }
 
+  function isCreedAllowed(address creed_) public view onlyOwner returns (address, string memory, uint, bool) {
+    return (_creedAllowList[creed_].creed, _creedAllowList[creed_].name, _creedAllowList[creed_].rate, _creedAllowList[creed_].allowed);
+  }
+
+  function getAllCreeds() public view onlyOwner returns (Creed[] memory) {
+    Creed[] memory allCreeds = new Creed[](_creedsAllowed.length);
+
+    for (uint i = 0; i < _creedsAllowed.length; i++) {
+      Creed memory creed = Creed({creed : _creedAllowList[_creedsAllowed[i]].creed, name : _creedAllowList[_creedsAllowed[i]].name, rate : _creedAllowList[_creedsAllowed[i]].rate, allowed : _creedAllowList[_creedsAllowed[i]].allowed});
+      allCreeds[i] = creed;
+    }
+    return allCreeds;
+  }
+
+  function clearCreedAllowList() external onlyOwner {
+    for (uint i = 0; i < _creedsAllowed.length; i++) {
+      delete _creedAllowList[_creedsAllowed[i]];
+    }
+    _creedsAllowed = new address[](0);
+  }
+
   function modifyCreedAllowList(address creed_, string calldata name_, uint rate_, bool allowed_) external onlyOwner {
     _modifyCreedAllowList(creed_, name_, rate_, allowed_);
   }
 
   function _modifyCreedAllowList(address creed_, string memory name_, uint rate_, bool allowed_) private {
+    require(keccak256(abi.encodePacked(name_)) != keccak256(""), "SEAFOOD: Creed name must not be empty");
+    if (keccak256(abi.encodePacked(_creedAllowList[creed_].name)) == keccak256("")) {
+      _creedsAllowed.push(creed_);
+    }
+
     _creedAllowList[creed_] = Creed(creed_, name_, rate_, allowed_);
 
     emit CreedAllowListUpdated(creed_, name_, rate_, allowed_);
@@ -282,7 +307,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     uint256 tokenId,
     bytes calldata data
   ) external override returns (bytes4) {
-    require(_creedAllowList[msg.sender].allowed == true, "SEAFOOD: This token is not allowed yet");
+    require(_creedAllowList[_msgSender()].allowed == true, "SEAFOOD: This token is not allowed yet");
     return _onERC721ReceivedSelector;
   }
 }
