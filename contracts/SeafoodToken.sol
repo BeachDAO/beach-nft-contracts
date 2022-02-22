@@ -244,10 +244,10 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     _freezeBalanceByStakingId(staking_.owner, stakingId);
     _markAsClaimed(stakingId, true);
 
-    _transferTokenBackToOwner(staking_.creed, staking_.tokenId, staking_.owner);
+    _transferTokenBackToOwner(staking_.creed, staking_.owner, staking_.tokenId);
   }
 
-  function _transferTokenBackToOwner(address creed_, uint tokenId_, address owner_) private {
+  function _transferTokenBackToOwner(address creed_, address owner_, uint tokenId_) private {
     IERC721(creed_).safeTransferFrom(address(this), owner_, tokenId_);
   }
 
@@ -261,7 +261,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
       uint tokenId_ = _stakings[stakingIds_[i]].tokenId;
       address owner_ = _getOwnerForCreedAndTokenId(creed_, tokenId_);
 
-      _transferTokenBackToOwner(creed_, tokenId_, owner_);
+      _transferTokenBackToOwner(creed_, owner_, tokenId_);
     }
   }
 

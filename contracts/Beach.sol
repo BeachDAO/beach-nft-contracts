@@ -109,7 +109,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   event PathUpdated(string path);
   event NameChanged(string name);
 
-  constructor(address lobster_, address seafood_, address[] memory accounts_, uint8[] memory shares_, uint blocksBeforeTheMint_) ERC721("Beach", "BEACH-NFT") {
+  constructor(address lobster_, address seafood_, address[] memory accounts_, uint8[] memory shares_, uint blocksBeforeTheMint_) ERC721("B34CH DAO", "B34CH") {
     _lobster = lobster_;
     _seafood = seafood_;
 
@@ -131,7 +131,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   /**
    * @dev Returns the wallet of a given wallet. Mainly for ease for frontend devs.
-   * @param _wallet The wallet to get the tokens of.
+   * @param wallet_ The wallet to get the tokens of.
    */
   function walletOfOwner(address wallet_)
   public
@@ -208,7 +208,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   /**
    * @dev Returns the metadata for a token Id
-   * @param _tokenId The tokenId to return the metadata for.
+   * @param tokenId_ The tokenId to return the metadata for.
    */
   function tokenURI(uint256 tokenId_)
   public
@@ -249,7 +249,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   modifier revealedStatus(bool revealStatus_) {
-    require(_revealed == revealStatus, string(abi.encodePacked("BEACH: REVEAL status is not ", revealStatus ? "TRUE" : "FALSE")));
+    require(_revealed == revealStatus_, string(abi.encodePacked("BEACH: REVEAL status is not ", revealStatus_ ? "TRUE" : "FALSE")));
     _;
   }
 
@@ -519,7 +519,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   function addPayeesBatch(address[] calldata accounts_, uint8[] calldata shares_) external onlyOwner {
     for (uint8 i = 0; i < accounts_.length; i++) {
-      _addPayee(account_[i], shares_[i]);
+      _addPayee(accounts_[i], shares_[i]);
     }
   }
 
@@ -545,7 +545,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   function updatePayeesBatch(address[] calldata accounts_, uint8[] calldata shares_) external onlyOwner {
     for (uint8 i = 0; i < accounts_.length; i++) {
-      _updatePayee(account_[i], shares_[i]);
+      _updatePayee(accounts_[i], shares_[i]);
     }
   }
 
@@ -565,7 +565,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     _split(outstandingBalance);
   }
 
-  function split() external onlyAccountOrOwner {
+  function split() external onlyAccountOrOwner(_msgSender()) {
     _splitOutstandingBalance();
   }
 
