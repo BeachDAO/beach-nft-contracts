@@ -49,7 +49,6 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Royalty.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
@@ -69,7 +68,7 @@ interface ISeafood {
 contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   uint private _tokenIdCounter = 0;
   bool private _revealed = false;
-  string private _baseURIPath = "https://lobby.mypinata.cloud/ipfs/";
+  string private _baseURIPath = "https://ipfs.io/ipfs/";
   string private _placeholderURI = "QmZc5HkKqUf1UiL9xqpanvbETB83Ter21AqMRUo1mbv9PN";
   string[2] private _revealedPath = ["", ""];
   bool private _freezeBasePath = false;
@@ -93,6 +92,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   uint private AMOUNT_NEEDED_FOR_NAME_CHANGE = 50;
 
+  // PaymentSplitter
   mapping(address => uint8) private _shares;
   mapping(address => uint256) private _released;
   mapping(address => uint256) private _balances;
@@ -104,21 +104,12 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   event PayeeAdded(address account, uint8 shares);
   event PayeeUpdated(address account, uint8 shares);
   event PaymentReleased(address account, uint256 amount);
-  event NFTMinted(uint256 tokenId, address mintedBy);
   event Revealed();
-  event PathUpdated(string path);
   event NameChanged(string name);
 
-  constructor(address lobster_, address seafood_, address[] memory accounts_, uint8[] memory shares_, uint blocksBeforeTheMint_) ERC721("B34CH DAO", "B34CH") {
+  constructor(address lobster_, uint blocksBeforeTheMint_) ERC721("B34CH DAO", "B34CH") {
     _lobster = lobster_;
-    _seafood = seafood_;
-
-    for (uint8 i = 0; i < accounts_.length; i++) {
-      _addPayee(accounts_[i], shares_[i]);
-    }
-
     _setDefaultRoyalty(address(this), 1000);
-
     _mintBlock = block.number + blocksBeforeTheMint_;
   }
 
@@ -147,59 +138,22 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     return tokensId;
   }
 
-  function _baseURI() internal view override returns (string memory) {
-    return _baseURIPath;
-  }
-
   modifier pathNotFrozen() {
-    require(!_freezeBasePath, "BEACH: Base Path frozen");
+    require(!_freezeBasePath, "B: Base Path frozen");
     _;
   }
 
-  function _updateBaseURI(string memory uri_) private pathNotFrozen {
-    _baseURIPath = uri_;
-  }
-
   // Function intended to be triggered by the DAO in case the Gateway or Network has an issue
-  function updateBaseURI(string memory uri_) external onlyOwner {
-    _updateBaseURI(uri_);
+  function updateBaseURI(string memory uri_) external onlyOwner pathNotFrozen {
+    _baseURIPath = uri_;
   }
 
   function freezeBasePath() external onlyOwner pathNotFrozen {
     _freezeBasePath = true;
   }
 
-  function getRevealedPath(uint256 tokenId_) public view returns (string memory) {
+  function getRevealedPath(uint256 tokenId_) internal view returns (string memory) {
     return tokenId_ < 1000 ? _revealedPath[0] : _revealedPath[1];
-  }
-
-  /**
-   * @dev Hash to metadata function
-   */
-  function hashToMetadata(uint tokenId_)
-  public
-  view
-  returns (string memory)
-  {
-    string memory metadataString;
-
-    for (uint8 i = 0; i < _beachMetadata[tokenId_].length; i++) {
-      metadataString = string(
-        abi.encodePacked(
-          metadataString,
-          '{"trait_type":"',
-          _TRAITS[i],
-          '","value":"',
-          _DICT[_beachMetadata[tokenId_][i]],
-          '"}'
-        )
-      );
-
-      if (i < _beachMetadata[tokenId_].length - 1)
-        metadataString = string(abi.encodePacked(metadataString, ","));
-    }
-
-    return string(abi.encodePacked("[", metadataString, "]"));
   }
 
   function contractURI() public view returns (string memory) {
@@ -216,52 +170,29 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   override
   returns (string memory)
   {
-    require(tokenId_ >= 0 && tokenId_ < MAX_SUPPLY, "$BEACH: TokenID does not exist");
+    require(tokenId_ >= 0 && tokenId_ < MAX_SUPPLY, "B: TokenID does not exist");
+    bytes memory smallImagePath = _revealed ? abi.encodePacked('"image": "', _baseURIPath, getRevealedPath(tokenId_), '/', BeachLibrary.toString(tokenId_), '.png",') : abi.encodePacked('"image": "', _baseURIPath, _placeholderURI, '",');
+    bytes memory bigImagePath = _revealed ? abi.encodePacked('"image": "', _baseURIPath, getRevealedPath(tokenId_), '/', BeachLibrary.toString(tokenId_), '_large.png",') : abi.encodePacked('"image": "', _baseURIPath, _placeholderURI, '",');
+    string memory attributes = _revealed ? BeachLibrary.hashToMetadata(tokenId_, _TRAITS, _DICT, _beachMetadata) : '[]';
 
-    return
-    string(
-      abi.encodePacked(
-        "data:application/json;base64,",
-        BeachLibrary.encode(
-          bytes(
-            string(
-              abi.encodePacked(
-                abi.encodePacked('{"name": "', beachName(tokenId_), '",'),
-                '"description": "BEACH", ',
-                '"token_id": ', Strings.toString(tokenId_), ', ',
-                '"art_number": ', Strings.toString(tokenId_ + 1), ', ',
-                _revealed ? abi.encodePacked('"image": "', _baseURI(), getRevealedPath(tokenId_), '/', tokenId_, '.png",') : abi.encodePacked('"image": "', _baseURI(), _placeholderURI, '",'),
-                _revealed ? abi.encodePacked('"image": "', _baseURI(), getRevealedPath(tokenId_), '/', tokenId_, '_large.png",') : abi.encodePacked('"image": "', _baseURI(), _placeholderURI, '",'),
-                '"attributes":',
-                _revealed ? hashToMetadata(tokenId_) : '[]',
-                "}"
-              )
-            )
-          )
-        )
-      )
-    );
-  }
-
-  modifier mintOpened() {
-    require(block.number > _mintBlock, "BEACH: Mint block not ready");
-    _;
+    return BeachLibrary.buildTokenURI(tokenId_, beachName(tokenId_), smallImagePath, bigImagePath, attributes);
   }
 
   modifier revealedStatus(bool revealStatus_) {
-    require(_revealed == revealStatus_, string(abi.encodePacked("BEACH: REVEAL status is not ", revealStatus_ ? "TRUE" : "FALSE")));
+    require(_revealed == revealStatus_, string(abi.encodePacked("B: REVEAL status is not ", revealStatus_ ? "TRUE" : "FALSE")));
     _;
   }
 
-  function gimmeBeaches(uint8 count_, bool isWaveList_, bytes32[] calldata merkleProof_) external payable mintOpened {
-    require(count_ <= 5, "GetABeach: MAX 5 beaches at once");
-    require(balanceOf(_msgSender()) + count_ < 10, "Beach: Too many beaches");
+  function gimmeBeaches(uint8 count_, bool isWaveList_, bytes32[] calldata merkleProof_) external payable {
+    require(block.number > _mintBlock, "B: Mint block not ready");
+    require(count_ <= 5, "B: MAX 5 beaches at once");
+    require(balanceOf(_msgSender()) + count_ < 10, "B: Too many beaches");
 
     if (isWaveList_) {
-      require(MerkleProof.verify(merkleProof_, waveListMerkleRoot, keccak256(abi.encodePacked(_msgSender()))), "BEACH: Not found in waveList");
+      require(MerkleProof.verify(merkleProof_, waveListMerkleRoot, keccak256(abi.encodePacked(_msgSender()))), "B: Not found in waveList");
     }
 
-    require(msg.value == getMyPriceForNextMint(isWaveList_), "Beach: Minting amount incorrect");
+    require(msg.value == getMyPriceForNextMint(isWaveList_), "B: Minting amount incorrect");
 
     for (uint8 i = 0; i < count_; i++) {
       _mintABeach(_msgSender());
@@ -269,18 +200,18 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   function safeMint(address to) public onlyOwner {
-    require(_tokenIdCounter < MAX_SUPPLY, "BEACH: mint reached max supply");
+    require(_tokenIdCounter < MAX_SUPPLY, "B: max supply reached");
     _safeMint(to, _tokenIdCounter);
-    _setName(_tokenIdCounter, Strings.toString(_tokenIdCounter));
+    _setName(_tokenIdCounter, BeachLibrary.toString(_tokenIdCounter));
   unchecked {
     _tokenIdCounter += 1;
   }
   }
 
   function _mintABeach(address to) private {
-    require(_tokenIdCounter < MAX_SUPPLY, "BEACH: mint reached max supply");
+    require(_tokenIdCounter < MAX_SUPPLY, "B: max supply reached");
     _safeMint(to, _tokenIdCounter);
-    _setName(_tokenIdCounter, Strings.toString(_tokenIdCounter));
+    _setName(_tokenIdCounter, BeachLibrary.toString(_tokenIdCounter));
   unchecked {
     _tokenIdCounter += 1;
   }
@@ -291,10 +222,10 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    */
   function setName(uint tokenId_, string memory name_) public {
     address owner = IERC721(address(this)).ownerOf(tokenId_);
-    require(owner == _msgSender(), "BEACH: You do not own this token");
-    require(validateName(name_), "BEACH: Name is not valid");
-    require(nameExists(name_) == false, "BEACH: Name requested is already used, please chose another");
-    require(resolveSeafoodBalance(_msgSender()) > AMOUNT_NEEDED_FOR_NAME_CHANGE, "BEACH: You do not have enough $BEACH balance to change the name");
+    require(owner == _msgSender(), "B: You do not own this token");
+    require(BeachLibrary.validateName(name_), "B: Name is not valid");
+    require(nameExists(name_) == false, "B: Name requested is already used");
+    require(resolveSeafoodBalance(_msgSender()) > AMOUNT_NEEDED_FOR_NAME_CHANGE, "B: You do not have enough balance");
 
     // Burn $BEACH
     _burnSeafoodToken(AMOUNT_NEEDED_FOR_NAME_CHANGE);
@@ -306,66 +237,17 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
       _existingNames[_beachNames[tokenId_]] = false;
     }
     _beachNames[tokenId_] = name_;
-    _existingNames[toLower(name_)] = true;
+    _existingNames[BeachLibrary.toLower(name_)] = true;
     emit NameChanged(name_);
   }
 
   function nameExists(string memory name_) public view returns (bool) {
-    return _existingNames[toLower(name_)];
+    return _existingNames[BeachLibrary.toLower(name_)];
   }
 
   function beachName(uint tokenId_) public view returns (string memory) {
-    bool isEmpty = keccak256(abi.encodePacked(_beachNames[tokenId_])) == keccak256(abi.encodePacked("")) || keccak256(abi.encodePacked(_beachNames[tokenId_])) == keccak256(bytes(Strings.toString(tokenId_)));
-    return string(abi.encodePacked("Beach ", isEmpty ? string(abi.encodePacked("#", Strings.toString(tokenId_))) : _beachNames[tokenId_]));
-  }
-
-  function validateName(string memory str) public pure returns (bool){
-    bytes memory b = bytes(str);
-    if (b.length < 1) return false;
-    if (b.length > 25) return false;
-    // Cannot be longer than 25 characters
-    if (b[0] == 0x20) return false;
-    // Leading space
-    if (b[b.length - 1] == 0x20) return false;
-    // Trailing space
-
-    bytes1 lastChar = b[0];
-
-    for (uint i; i < b.length; i++) {
-      bytes1 char = b[i];
-
-      if (char == 0x20 && lastChar == 0x20) return false;
-      // Cannot contain continuous spaces
-
-      if (
-        !(char >= 0x30 && char <= 0x39) && //9-0
-      !(char >= 0x41 && char <= 0x5A) && //A-Z
-      !(char >= 0x61 && char <= 0x7A) && //a-z
-      !(char == 0x20) //space
-      )
-        return false;
-
-      lastChar = char;
-    }
-
-    return true;
-  }
-
-  /**
-  * @dev Converts the string to lowercase
-	 */
-  function toLower(string memory str) public pure returns (string memory){
-    bytes memory bStr = bytes(str);
-    bytes memory bLower = new bytes(bStr.length);
-    for (uint i = 0; i < bStr.length; i++) {
-      // Uppercase character
-      if ((uint8(bStr[i]) >= 65) && (uint8(bStr[i]) <= 90)) {
-        bLower[i] = bytes1(uint8(bStr[i]) + 32);
-      } else {
-        bLower[i] = bStr[i];
-      }
-    }
-    return string(bLower);
+    bool isEmpty = keccak256(abi.encodePacked(_beachNames[tokenId_])) == keccak256(abi.encodePacked("")) || keccak256(abi.encodePacked(_beachNames[tokenId_])) == keccak256(bytes(BeachLibrary.toString(tokenId_)));
+    return string(abi.encodePacked("Beach ", isEmpty ? string(abi.encodePacked("#", BeachLibrary.toString(tokenId_))) : _beachNames[tokenId_]));
   }
 
   /**
@@ -382,7 +264,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   function _burnSeafoodToken(uint amount_) private returns (bool) {
     uint __amount = _toFullDecimals(amount_);
-    require(resolveSeafoodBalance(_msgSender()) >= __amount, "BEACH: Not enough $BEACH balance to burn");
+    require(resolveSeafoodBalance(_msgSender()) >= __amount, "B: Not enough balance");
     IERC20Burnable(_seafood).burnFrom(_msgSender(), __amount);
     return true;
   }
@@ -418,25 +300,17 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   function setMetadata(uint16[2] calldata range, uint16[][] calldata metadata) external onlyOwner returns (bool) {
-    require(range[0] >= 0 && range[0] < range[1] && range[1] <= MAX_SUPPLY, "BEACH: Range incorrect");
+    require(range[0] >= 0 && range[0] < range[1] && range[1] <= MAX_SUPPLY, "B: Range incorrect");
     for (uint i = 0; i < range[1] - range[0]; i++) {
       uint tokenId_ = i + range[0];
 
-      // Properties.TRAITS_SAND
       _beachMetadata[tokenId_][0] = metadata[i][0];
-      // Properties.TRAITS_WATER
       _beachMetadata[tokenId_][1] = metadata[i][1];
-      // Properties.TRAITS_WAVES
       _beachMetadata[tokenId_][2] = metadata[i][2];
-      // Properties.TRAITS_SPARKLING
       _beachMetadata[tokenId_][3] = metadata[i][3];
-      // Properties.TRAITS_LOCATION
       _beachMetadata[tokenId_][4] = metadata[i][4];
-      // Properties.TRAITS_FRAME
       _beachMetadata[tokenId_][5] = metadata[i][5];
-      // Properties.TRAITS_FEATURE
       _beachMetadata[tokenId_][6] = metadata[i][6];
-      // Properties.TRAITS_SIGN
       _beachMetadata[tokenId_][7] = metadata[i][7];
     }
 
@@ -448,7 +322,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   function reveal(string[] calldata paths) external onlyOwner {
-    require(_revealed == false, "BEACH: _revealed already set");
+    require(_revealed == false, "B: already revealed");
     _revealed = true;
     _revealedPath[0] = paths[0];
     _revealedPath[1] = paths[1];
@@ -496,13 +370,12 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    **************************/
 
   function _addPayee(address account_, uint8 shares_) private {
-    require(account_ != address(0), "PaymentSplitter: Address can't be 0");
-    require(shares_ > 0, "PaymentSplitter: Shares can't be 0");
-    require(_totalShares + shares_ < 256, "PaymentSplitter: Max shares reached");
-    require(_shares[account_] == 0, "PaymentSplitter: Account already has shares");
-    require(_released[account_] == 0, "PaymentSplitter: Released is non-0 for this account");
-    require(_balances[account_] == 0, "PaymentSplitter: Balances is non-0 for this account");
-    require(_payees.length < 256, "PaymentSplitter: Too many shareholders");
+    require(account_ != address(0), "PS: Address can't be 0");
+    require(shares_ > 0, "PS: Shares can't be 0");
+    require(_totalShares + shares_ < 256, "PS: Max shares reached");
+    require(_shares[account_] == 0, "PS: Account already has shares");
+    require(_released[account_] == 0 || _balances[account_] == 0, "PS: Released or balances is non-0 for this account");
+    require(_payees.length < 256, "PS: Too many shareholders");
 
     _payees.push(account_);
     _shares[account_] = shares_;
@@ -524,9 +397,9 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   function _updatePayee(address account_, uint8 shares_) private {
-    require(account_ != address(0), "PaymentSplitter: Address can't be 0");
-    require(_released[account_] > 0 || _balances[account_] > 0, "PaymentSplitter: Account doesn't exist");
-    require(_totalShares - _shares[account_] + shares_ < 256, "PaymentSplitter: Max shares reached");
+    require(account_ != address(0), "PS: Address can't be 0");
+    require(_released[account_] > 0 || _balances[account_] > 0, "PS: Account doesn't exist");
+    require(_totalShares - _shares[account_] + shares_ < 256, "PS: Max shares reached");
 
     uint8 sharesBefore = _shares[account_];
 
@@ -570,7 +443,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   function release(address payable account) external onlyAccountOrOwner(account) {
-    require(_balances[account] > 0, "PaymentSplitter: Account has no balance");
+    require(_balances[account] > 0, "PS: Account has no balance");
 
     _splitOutstandingBalance();
 

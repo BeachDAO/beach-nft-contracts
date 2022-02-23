@@ -81,8 +81,11 @@ library BeachLibrary {
 
   /**
    * @dev Converts a `uint256` to its ASCII `string` decimal representation.
-   */
+     */
   function toString(uint256 value) internal pure returns (string memory) {
+    // Inspired by OraclizeAPI's implementation - MIT licence
+    // https://github.com/oraclize/ethereum-api/blob/b42146b063c7d6ee1358846c198246239e9360e8/oraclizeAPI_0.4.25.sol
+
     if (value == 0) {
       return "0";
     }
@@ -101,37 +104,6 @@ library BeachLibrary {
     return string(buffer);
   }
 
-  function parseInt(string memory _a)
-  internal
-  pure
-  returns (uint8 _parsedInt)
-  {
-    bytes memory bresult = bytes(_a);
-    uint8 mint = 0;
-    for (uint8 i = 0; i < bresult.length; i++) {
-      if (
-        (uint8(uint8(bresult[i])) >= 48) &&
-        (uint8(uint8(bresult[i])) <= 57)
-      ) {
-        mint *= 10;
-        mint += uint8(bresult[i]) - 48;
-      }
-    }
-    return mint;
-  }
-
-  function substring(
-    string memory str,
-    uint256 startIndex,
-    uint256 endIndex
-  ) internal pure returns (string memory) {
-    bytes memory strBytes = bytes(str);
-    bytes memory result = new bytes(endIndex - startIndex);
-    for (uint256 i = startIndex; i < endIndex; i++) {
-      result[i - startIndex] = strBytes[i];
-    }
-    return string(result);
-  }
 
   function isContract(address account) internal view returns (bool) {
     // This method relies on extcodesize, which returns 0 for contracts in
@@ -143,5 +115,124 @@ library BeachLibrary {
       size := extcodesize(account)
     }
     return size > 0;
+  }
+
+  function validateName(string memory str) public pure returns (bool){
+    bytes memory b = bytes(str);
+    if (b.length < 1) return false;
+    if (b.length > 25) return false;
+    // Cannot be longer than 25 characters
+    if (b[0] == 0x20) return false;
+    // Leading space
+    if (b[b.length - 1] == 0x20) return false;
+    // Trailing space
+
+    bytes1 lastChar = b[0];
+
+    for (uint i; i < b.length; i++) {
+      bytes1 char = b[i];
+
+      if (char == 0x20 && lastChar == 0x20) return false;
+      // Cannot contain continuous spaces
+
+      if (
+        !(char >= 0x30 && char <= 0x39) && //9-0
+      !(char >= 0x41 && char <= 0x5A) && //A-Z
+      !(char >= 0x61 && char <= 0x7A) && //a-z
+      !(char == 0x20) //space
+      )
+        return false;
+
+      lastChar = char;
+    }
+
+    return true;
+  }
+
+  /**
+  * @dev Converts the string to lowercase
+	 */
+  function toLower(string memory str) internal pure returns (string memory){
+    bytes memory bStr = bytes(str);
+    bytes memory bLower = new bytes(bStr.length);
+    for (uint i = 0; i < bStr.length; i++) {
+      // Uppercase character
+      if ((uint8(bStr[i]) >= 65) && (uint8(bStr[i]) <= 90)) {
+        bLower[i] = bytes1(uint8(bStr[i]) + 32);
+      } else {
+        bLower[i] = bStr[i];
+      }
+    }
+    return string(bLower);
+  }
+
+  /**
+ * @dev Hash to metadata function
+   */
+  function hashToMetadata(uint tokenId_, string[] memory TRAITS_, string[] memory DICT_, mapping(uint256 => uint16[8]) storage beachMetadata_)
+  public
+  view
+  returns (string memory)
+  {
+    string memory metadataString;
+
+    for (uint8 i = 0; i < beachMetadata_[tokenId_].length; i++) {
+      metadataString = string(
+        abi.encodePacked(
+          metadataString,
+          '{"trait_type":"',
+          TRAITS_[i],
+          '","value":"',
+          DICT_[beachMetadata_[tokenId_][i]],
+          '"}'
+        )
+      );
+
+      if (i < beachMetadata_[tokenId_].length - 1)
+        metadataString = string(abi.encodePacked(metadataString, ","));
+    }
+
+    return string(abi.encodePacked("[", metadataString, "]"));
+  }
+
+  // tokenId_,
+  // beachName(tokenId_),
+  // _revealed,
+  // _baseURIPath,
+  // getRevealedPath(tokenId_),
+  // _placeholderURI,
+  // _TRAITS,
+  // _DICT,
+  // _beachMetadata
+  function buildTokenURI(
+    uint tokenId_,
+    string memory beachName_,
+    bytes memory smallImagePath_,
+    bytes memory bigImagePath_,
+    string memory attributes_
+  ) public view returns (string memory) {
+    return
+    string(
+      abi.encodePacked(
+        "data:application/json;base64,",
+        encode(
+          bytes(
+            string(
+              abi.encodePacked(
+                abi.encodePacked('{"name": "', beachName_, '",'),
+                '"description": "BEACH", ',
+                '"token_id": ', toString(tokenId_), ', ',
+                '"art_number": ', toString(tokenId_ + 1), ', ',
+                smallImagePath_,
+                bigImagePath_,
+                '"attributes":',
+                attributes_,
+                "}"
+              )
+            )
+          )
+        )
+      )
+    );
   }
 }

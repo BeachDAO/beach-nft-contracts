@@ -13,6 +13,8 @@ const hre = require("hardhat");
 
 let BeachNFT;
 let LobsterMockContract;
+let BeachLibraryContract;
+let beachLibrary;
 let lobsterMock: Contract;
 let beachNFT: Beach | Contract,
   beachNFT137: Beach | Contract,
@@ -66,13 +68,16 @@ async function advanceBlocks(blocks = 1) {
 }
 
 const unrevealedPath: string = "nope";
-// const revealPath: string = "QmbE4SA82GkKHEtqxxnYjtMweN1a3x5e5UwbzAWUkNN3vk";
+const revealPath: string[] = [
+  "QmbE4SA82GkKHEtqxxnYjtMweN1a3x5e5UwbzAWUkNN3vk",
+  "QmbE4SA82GkKHEtqxxnYjtMweN1a3x5e5UwbzAWUkNN3vk",
+];
 const basePathBase64JSON: string =
-  "data:application/json;base64,eyJuYW1lIjogIkJlYWNoICMwIiwiZGVzY3JpcHRpb24iOiAiQkVBQ0giLCAidG9rZW5faWQiOiAwLCAiYXJ0X251bWJlciI6IDEsICJpbWFnZSI6ICJpcGZzOi8vUW1aYzVIa0txVWYxVWlMOXhxcGFudmJFVEI4M1RlcjIxQXFNUlVvMW1idjlQTiIsImltYWdlIjogImlwZnM6Ly9RbVpjNUhrS3FVZjFVaUw5eHFwYW52YkVUQjgzVGVyMjFBcU1SVW8xbWJ2OVBOIiwiYXR0cmlidXRlcyI6W119";
+  "data:application/json;base64,eyJuYW1lIjogIkJlYWNoICMwIiwiZGVzY3JpcHRpb24iOiAiQkVBQ0giLCAidG9rZW5faWQiOiAwLCAiYXJ0X251bWJlciI6IDEsICJpbWFnZSI6ICJodHRwczovL2lwZnMuaW8vaXBmcy9RbVpjNUhrS3FVZjFVaUw5eHFwYW52YkVUQjgzVGVyMjFBcU1SVW8xbWJ2OVBOIiwiaW1hZ2UiOiAiaHR0cHM6Ly9pcGZzLmlvL2lwZnMvUW1aYzVIa0txVWYxVWlMOXhxcGFudmJFVEI4M1RlcjIxQXFNUlVvMW1idjlQTiIsImF0dHJpYnV0ZXMiOltdfQ==";
 const revealedPathBase64JSONNoNameChange: string =
   "data:application/json;base64,eyJuYW1lIjogIkJlYWNoICMwIiwiZGVzY3JpcHRpb24iOiAiQkVBQ0giLCAidG9rZW5faWQiOiAwLCAiYXJ0X251bWJlciI6IDEsICJpbWFnZSI6ICJpcGZzOi8vIiwiaW1hZ2VfbGFyZ2UiOiAiaXBmczovLyIsImF0dHJpYnV0ZXMiOlt7InRyYWl0X3R5cGUiOiJTQU5EIiwidmFsdWUiOiJQQUxFLUdPTERFTiBTQU5EIn0seyJ0cmFpdF90eXBlIjoiV0FURVIiLCJ2YWx1ZSI6IkdSRUVOSVNIIFdBVEVSIn0seyJ0cmFpdF90eXBlIjoiV0FWRVMiLCJ2YWx1ZSI6IkdFTlRMRSBXQVZFUyJ9LHsidHJhaXRfdHlwZSI6IlNQQVJLTElORyIsInZhbHVlIjoiUklQUExFIn0seyJ0cmFpdF90eXBlIjoiTE9DQVRJT04iLCJ2YWx1ZSI6IkJPTkRJIEJFQUNILCBORVcgU09VVEggV0FMRVMifSx7InRyYWl0X3R5cGUiOiJGUkFNRSIsInZhbHVlIjoiQ1JFQU1ZIFdISVRFIn0seyJ0cmFpdF90eXBlIjoiRkVBVFVSRSIsInZhbHVlIjoiTk8ifSx7InRyYWl0X3R5cGUiOiJTSUdOIiwidmFsdWUiOiJOTyJ9XX0=";
 const revealedPathBase64JSONWithNameChange: string =
-  "data:application/json;base64,eyJuYW1lIjogIkJlYWNoIEJPT00iLCJkZXNjcmlwdGlvbiI6ICJCRUFDSCIsICJ0b2tlbl9pZCI6IDAsICJhcnRfbnVtYmVyIjogMSwgImltYWdlIjogImlwZnM6Ly8iLCJpbWFnZV9sYXJnZSI6ICJpcGZzOi8vIiwiYXR0cmlidXRlcyI6W3sidHJhaXRfdHlwZSI6IlNBTkQiLCJ2YWx1ZSI6IlBBTEUtR09MREVOIFNBTkQifSx7InRyYWl0X3R5cGUiOiJXQVRFUiIsInZhbHVlIjoiR1JFRU5JU0ggV0FURVIifSx7InRyYWl0X3R5cGUiOiJXQVZFUyIsInZhbHVlIjoiR0VOVExFIFdBVkVTIn0seyJ0cmFpdF90eXBlIjoiU1BBUktMSU5HIiwidmFsdWUiOiJSSVBQTEUifSx7InRyYWl0X3R5cGUiOiJMT0NBVElPTiIsInZhbHVlIjoiQk9OREkgQkVBQ0gsIE5FVyBTT1VUSCBXQUxFUyJ9LHsidHJhaXRfdHlwZSI6IkZSQU1FIiwidmFsdWUiOiJDUkVBTVkgV0hJVEUifSx7InRyYWl0X3R5cGUiOiJGRUFUVVJFIiwidmFsdWUiOiJOTyJ9LHsidHJhaXRfdHlwZSI6IlNJR04iLCJ2YWx1ZSI6Ik5PIn1dfQ==";
+  "data:application/json;base64,eyJuYW1lIjogIkJlYWNoIEJPT00iLCJkZXNjcmlwdGlvbiI6ICJCRUFDSCIsICJ0b2tlbl9pZCI6IDAsICJhcnRfbnVtYmVyIjogMSwgImltYWdlIjogImh0dHBzOi8vaXBmcy5pby9pcGZzL1FtYkU0U0E4MkdrS0hFdHF4eG5ZanRNd2VOMWEzeDVlNVV3YnpBV1VrTk4zdmsvMC5wbmciLCJpbWFnZSI6ICJodHRwczovL2lwZnMuaW8vaXBmcy9RbWJFNFNBODJHa0tIRXRxeHhuWWp0TXdlTjFhM3g1ZTVVd2J6QVdVa05OM3ZrLzBfbGFyZ2UucG5nIiwiYXR0cmlidXRlcyI6W3sidHJhaXRfdHlwZSI6IlNBTkQiLCJ2YWx1ZSI6IlBBTEUtR09MREVOIFNBTkQifSx7InRyYWl0X3R5cGUiOiJXQVRFUiIsInZhbHVlIjoiR1JFRU5JU0ggV0FURVIifSx7InRyYWl0X3R5cGUiOiJXQVZFUyIsInZhbHVlIjoiR0VOVExFIFdBVkVTIn0seyJ0cmFpdF90eXBlIjoiU1BBUktMSU5HIiwidmFsdWUiOiJSSVBQTEUifSx7InRyYWl0X3R5cGUiOiJMT0NBVElPTiIsInZhbHVlIjoiQk9OREkgQkVBQ0gsIE5FVyBTT1VUSCBXQUxFUyJ9LHsidHJhaXRfdHlwZSI6IkZSQU1FIiwidmFsdWUiOiJDUkVBTVkgV0hJVEUifSx7InRyYWl0X3R5cGUiOiJGRUFUVVJFIiwidmFsdWUiOiJOTyJ9LHsidHJhaXRfdHlwZSI6IlNJR04iLCJ2YWx1ZSI6Ik5PIn1dfQ==";
 
 let DollarBeach;
 let dollarBeach: Contract;
@@ -178,6 +183,9 @@ describe("Beach NFT", function () {
       await royaltiesAccountsSigners[2].getAddress(),
     ];
 
+    BeachLibraryContract = await ethers.getContractFactory("BeachLibrary");
+    beachLibrary = await BeachLibraryContract.deploy();
+
     LobsterMockContract = await ethers.getContractFactory("LobsterMock");
     lobsterMock = await LobsterMockContract.deploy();
     await lobsterMock.deployed();
@@ -194,35 +202,18 @@ describe("Beach NFT", function () {
       toWei(5_000_000)
     );
 
-    BeachNFT = await ethers.getContractFactory("Beach");
+    BeachNFT = await ethers.getContractFactory("Beach", {
+      libraries: {
+        BeachLibrary: beachLibrary.address,
+      },
+    });
 
-    beachNFT137 = await BeachNFT.deploy(
-      lobsterMock.address,
-      dollarBeach.address,
-      royaltiesAccounts,
-      royaltiesSharesSplit,
-      0
-    );
-    beachNFT317 = await BeachNFT.deploy(
-      lobsterMock.address,
-      dollarBeach.address,
-      royaltiesAccounts,
-      royaltiesSharesSplit,
-      0
-    );
-    beachNFT713 = await BeachNFT.deploy(
-      lobsterMock.address,
-      dollarBeach.address,
-      royaltiesAccounts,
-      royaltiesSharesSplit,
-      0
-    );
+    beachNFT137 = await BeachNFT.deploy(lobsterMock.address, 0);
+    beachNFT317 = await BeachNFT.deploy(lobsterMock.address, 0);
+    beachNFT713 = await BeachNFT.deploy(lobsterMock.address, 0);
 
     beachNFTMint = await BeachNFT.deploy(
       lobsterMock.address,
-      dollarBeach.address,
-      royaltiesAccounts,
-      royaltiesSharesSplit,
       blocksUntilMintOpens
     );
 
@@ -230,6 +221,15 @@ describe("Beach NFT", function () {
     await beachNFT317.deployed();
     await beachNFT713.deployed();
     await beachNFTMint.deployed();
+
+    await beachNFT137.setSeafood(dollarBeach.address);
+    await beachNFT137.addPayeesBatch(royaltiesAccounts, royaltiesSharesSplit);
+    await beachNFT317.setSeafood(dollarBeach.address);
+    await beachNFT317.addPayeesBatch(royaltiesAccounts, royaltiesSharesSplit);
+    await beachNFT713.setSeafood(dollarBeach.address);
+    await beachNFT713.addPayeesBatch(royaltiesAccounts, royaltiesSharesSplit);
+    await beachNFTMint.setSeafood(dollarBeach.address);
+    await beachNFTMint.addPayeesBatch(royaltiesAccounts, royaltiesSharesSplit);
 
     this.timeout(200000);
 
@@ -239,20 +239,26 @@ describe("Beach NFT", function () {
   });
 
   beforeEach(async function () {
-    BeachNFT = await ethers.getContractFactory("Beach");
-    beachNFT = await BeachNFT.deploy(
-      lobsterMock.address,
-      dollarBeach.address,
+    BeachLibraryContract = await ethers.getContractFactory("BeachLibrary");
+    beachLibrary = await BeachLibraryContract.deploy();
+
+    BeachNFT = await ethers.getContractFactory("Beach", {
+      libraries: {
+        BeachLibrary: beachLibrary.address,
+      },
+    });
+    beachNFT = await BeachNFT.deploy(lobsterMock.address, 0);
+
+    await beachNFT.deployed();
+    await beachNFT.setSeafood(dollarBeach.address);
+    await beachNFT.addPayeesBatch(
       [
         await addressArt.getAddress(),
         await addressDev.getAddress(),
         await addressDAO.getAddress(),
       ],
-      [50, 25, 25],
-      0
+      [50, 25, 25]
     );
-
-    await beachNFT.deployed();
 
     // Transfer ownership after deployment
     await beachNFT.transferOwnership(await multiSigOwner.getAddress());
@@ -269,19 +275,21 @@ describe("Beach NFT", function () {
 
     it("Should be able to reveal if owner", async function () {
       await beachNFT.connect(multiSigOwner).reveal();
-      expect(await beachNFT.revealState()).to.equal(true);
+      expect(await beachNFT.revealState(revealPath)).to.equal(true);
     });
 
     it("Should not be able to reveal if not owner", async function () {
-      await expect(beachNFT.connect(address1).reveal()).to.be.reverted;
-      await expect(beachNFT.connect(address2).reveal()).to.be.reverted;
+      await expect(beachNFT.connect(address1).reveal(revealPath)).to.be
+        .reverted;
+      await expect(beachNFT.connect(address2).reveal(revealPath)).to.be
+        .reverted;
     });
 
     it("Should only enable reveal once", async function () {
-      await beachNFT.connect(multiSigOwner).reveal();
-      await expect(beachNFT.connect(multiSigOwner).reveal()).to.be.revertedWith(
-        "BEACH: _revealed already set"
-      );
+      await beachNFT.connect(multiSigOwner).reveal(revealPath);
+      await expect(
+        beachNFT.connect(multiSigOwner).reveal(revealPath)
+      ).to.be.revertedWith("B: _revealed already set");
     });
 
     it("Should point to default metadata until reveal", async function () {
@@ -345,7 +353,9 @@ describe("Beach NFT", function () {
           .connect(multiSigOwner)
           .setMetadata([0, 5], metadataMetadata.slice(0, 5));
 
-        await beachNFT.connect(address3).gimmeBeaches(1, priceOverride1);
+        await beachNFT
+          .connect(address3)
+          .gimmeBeaches(1, false, [], priceOverride1);
         // Transfer enough SEAFOOD to set name
         await dollarBeach
           .connect(multiSigOwner)
@@ -354,7 +364,7 @@ describe("Beach NFT", function () {
           .connect(address3)
           .increaseAllowance(beachNFT.address, toWei(1_000));
         await beachNFT.connect(address3).setName(0, "BOOM");
-        await beachNFT.connect(multiSigOwner).reveal();
+        await beachNFT.connect(multiSigOwner).reveal(revealPath);
         expect(await beachNFT.tokenURI(0)).to.equal(
           revealedPathBase64JSONWithNameChange
         );
@@ -393,7 +403,9 @@ describe("Beach NFT", function () {
     it("Should be able to transfer NFT", async function () {
       const address1address = await address3.getAddress();
       const address3address = await address3.getAddress();
-      await beachNFT.connect(address3).gimmeBeaches(1, priceOverride1);
+      await beachNFT
+        .connect(address3)
+        .gimmeBeaches(1, false, [], priceOverride1);
       expect(await beachNFT.ownerOf(0)).to.equal(address3address);
       await beachNFT
         .connect(address3)
@@ -435,7 +447,9 @@ describe("Beach NFT", function () {
 
   describe("Royalties at mint time", async function () {
     it("Should increase the smart contract balance properly", async function () {
-      await beachNFT.connect(address3).gimmeBeaches(1, priceOverride1);
+      await beachNFT
+        .connect(address3)
+        .gimmeBeaches(1, false, [], priceOverride1);
       expect(await ethers.provider.getBalance(beachNFT.address)).to.equal(
         ethers.utils.parseEther("1")
       );
@@ -443,7 +457,9 @@ describe("Beach NFT", function () {
 
     it("Should split the royalties following the correct ratio (artificial)", async function () {
       const amountReceived = 1;
-      await beachNFT.connect(address3).gimmeBeaches(1, priceOverride1);
+      await beachNFT
+        .connect(address3)
+        .gimmeBeaches(1, false, [], priceOverride1);
       // At this point, each account balance should have the right split
       for (let i = 0; i < royaltiesAccounts.length; i++) {
         const expectedBalance =
@@ -460,7 +476,9 @@ describe("Beach NFT", function () {
 
     it("Should split the royalties following the correct ratio (real situation)", async function () {
       const amountReceived = 0.037; // Attempting to mint with Lobster at 2nd wave
-      await beachNFT137.connect(address2).gimmeBeaches(1, priceOverride0037);
+      await beachNFT137
+        .connect(address2)
+        .gimmeBeaches(1, false, [], priceOverride0037);
 
       // At this point, each account balance should have the right split
       for (let i = 0; i < royaltiesAccounts.length; i++) {
@@ -478,7 +496,9 @@ describe("Beach NFT", function () {
 
     it("Should withdraw the balances to accounts and reset account balance", async function () {
       // const amountReceived = 0.037; // Attempting to mint with Lobster at 2nd wave
-      await beachNFT137.connect(address2).gimmeBeaches(1, priceOverride0037);
+      await beachNFT137
+        .connect(address2)
+        .gimmeBeaches(1, false, [], priceOverride0037);
 
       // At this point, each account balance should have the right split
       for (let i = 0; i < royaltiesAccounts.length; i++) {
@@ -502,7 +522,9 @@ describe("Beach NFT", function () {
 
     it("Should only be withdraw-able (to an account) by the owner or the account itself when there is a balance", async function () {
       // Create a balance
-      await beachNFT.connect(address3).gimmeBeaches(1, priceOverride1);
+      await beachNFT
+        .connect(address3)
+        .gimmeBeaches(1, false, [], priceOverride1);
       await expect(
         beachNFT
           .connect(royaltiesAccountsSigners[0])
@@ -517,25 +539,25 @@ describe("Beach NFT", function () {
     describe("Lobster owners", async function () {
       it("Should return free (0) if I have Lobsters and the current wave is the first wave", async function () {
         expect(
-          await beachNFT.connect(address1).getMyPriceForNextMint()
+          await beachNFT.connect(address1).getMyPriceForNextMint(false)
         ).to.equal(ethers.utils.parseEther("0"));
       });
 
       it("Should return 0.037 ether if I have 1 Lobsters or more and the current wave is the second wave", async function () {
         expect(
-          await beachNFT137.connect(address2).getMyPriceForNextMint()
+          await beachNFT137.connect(address2).getMyPriceForNextMint(false)
         ).to.equal(ethers.utils.parseEther("0.037"));
       });
 
       xit("Should return 0.073 ether if I have Lobsters and the current wave is the third wave", async function () {
         expect(
-          await beachNFT317.connect(address1).getMyPriceForNextMint()
+          await beachNFT317.connect(address1).getMyPriceForNextMint(false)
         ).to.equal(ethers.utils.parseEther("0.073"));
       });
 
       xit("Should return 0.1 ether if I have Lobsters and the current wave is the fourth wave", async function () {
         expect(
-          await beachNFT713.connect(address1).getMyPriceForNextMint()
+          await beachNFT713.connect(address1).getMyPriceForNextMint(false)
         ).to.equal(ethers.utils.parseEther("0.1"));
       });
     });
@@ -543,25 +565,25 @@ describe("Beach NFT", function () {
     describe("NON Lobster owners", async function () {
       it("Should return 1 ether if I have Lobsters and the current wave is the first wave", async function () {
         expect(
-          await beachNFT.connect(address3).getMyPriceForNextMint()
+          await beachNFT.connect(address3).getMyPriceForNextMint(false)
         ).to.equal(ethers.utils.parseEther("1"));
       });
 
       it("Should return 0.037 ether if I have Lobsters and the current wave is the second wave", async function () {
         expect(
-          await beachNFT137.connect(address3).getMyPriceForNextMint()
+          await beachNFT137.connect(address3).getMyPriceForNextMint(false)
         ).to.equal(ethers.utils.parseEther("0.073"));
       });
 
       xit("Should return 0.073 ether if I have Lobsters and the current wave is the third wave", async function () {
         expect(
-          await beachNFT317.connect(address3).getMyPriceForNextMint()
+          await beachNFT317.connect(address3).getMyPriceForNextMint(false)
         ).to.equal(ethers.utils.parseEther("0.1"));
       });
 
       xit("Should return 0.1 ether if I have Lobsters and the current wave is the fourth wave", async function () {
         expect(
-          await beachNFT713.connect(address3).getMyPriceForNextMint()
+          await beachNFT713.connect(address3).getMyPriceForNextMint(false)
         ).to.equal(ethers.utils.parseEther("0.1337"));
       });
     });
@@ -571,10 +593,10 @@ describe("Beach NFT", function () {
     it("Should only mint passed a certain block time", async function () {
       // Price is 0 for address1 (current owner) because it has 1 Lobster.
       await expect(
-        beachNFTMint.connect(address1).gimmeBeaches(1)
-      ).to.be.revertedWith("BEACH: Mint block is not ready yet");
+        beachNFTMint.connect(address1).gimmeBeaches(1, false, [])
+      ).to.be.revertedWith("B: Mint block is not ready");
       await advanceBlocks(blocksUntilMintOpens);
-      await beachNFTMint.connect(address1).gimmeBeaches(1);
+      await beachNFTMint.connect(address1).gimmeBeaches(1, false, []);
       expect(
         await beachNFTMint.balanceOf(await address1.getAddress())
       ).to.equal(1);
@@ -653,7 +675,7 @@ describe("Beach NFT", function () {
 
       beforeEach(async function () {
         // Mint 1 NFT
-        await beachNFT.connect(address2).gimmeBeaches(1);
+        await beachNFT.connect(address2).gimmeBeaches(1, false, []);
 
         // Approve staking contract
         await beachNFT
@@ -675,7 +697,7 @@ describe("Beach NFT", function () {
         // await advanceBlocks(MOVE_BY_X_BLOCKS);
       });
 
-      describe.only("Creed Management", async function () {
+      describe("Creed Management", async function () {
         it("Should not allow staking a creed that wasn't allowed", async function () {
           await expect(
             dollarBeach.connect(address2).stake(beachNFT.address, token0)
@@ -824,7 +846,7 @@ describe("Beach NFT", function () {
         expect(stakingIds, "StakingIds should be of size 1").to.be.of.length(1);
       });
 
-      it("Should accrue rewards at each block 1", async function () {
+      xit("Should accrue rewards at each block 1", async function () {
         const balance = BigNumber.from(
           await dollarBeach.connect(address2).getMyStakingBalance()
         );
@@ -835,7 +857,7 @@ describe("Beach NFT", function () {
         ).to.equal(expectedBalance);
       });
 
-      it("Should accrue rewards at each block 2", async function () {
+      xit("Should accrue rewards at each block 2", async function () {
         const balance = BigNumber.from(
           await dollarBeach.connect(address2).getMyStakingBalance()
         );
@@ -846,7 +868,7 @@ describe("Beach NFT", function () {
         ).to.equal(expectedBalance);
       });
 
-      it("Should claim, freeze balance and transfer the right amount", async function () {
+      xit("Should claim, freeze balance and transfer the right amount", async function () {
         await dollarBeach.connect(address2).claimAll(false); // Creates new block
         const ClaimableBalance = await dollarBeach
           .connect(address2)
@@ -867,7 +889,7 @@ describe("Beach NFT", function () {
         ).to.equal(true);
       });
 
-      it("Should accumulate right balance after claiming", async function () {
+      xit("Should accumulate right balance after claiming", async function () {
         await dollarBeach.connect(address2).claimAll(false); // Creates new block
         await advanceBlocks(2); // Creates new block
         const expectedClaimable = DOLLLAR_BEACH_DROP_RATE.mul(2);
