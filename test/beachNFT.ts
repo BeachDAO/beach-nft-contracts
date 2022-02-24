@@ -75,12 +75,14 @@ const revealPath: string[] = [
 const basePathBase64JSON: string =
   "data:application/json;base64,eyJuYW1lIjogIkJlYWNoICMwIiwiZGVzY3JpcHRpb24iOiAiQkVBQ0giLCAidG9rZW5faWQiOiAwLCAiYXJ0X251bWJlciI6IDEsICJpbWFnZSI6ICJodHRwczovL2lwZnMuaW8vaXBmcy9RbVpjNUhrS3FVZjFVaUw5eHFwYW52YkVUQjgzVGVyMjFBcU1SVW8xbWJ2OVBOIiwiaW1hZ2UiOiAiaHR0cHM6Ly9pcGZzLmlvL2lwZnMvUW1aYzVIa0txVWYxVWlMOXhxcGFudmJFVEI4M1RlcjIxQXFNUlVvMW1idjlQTiIsImF0dHJpYnV0ZXMiOltdfQ==";
 const revealedPathBase64JSONNoNameChange: string =
-  "data:application/json;base64,eyJuYW1lIjogIkJlYWNoICMwIiwiZGVzY3JpcHRpb24iOiAiQkVBQ0giLCAidG9rZW5faWQiOiAwLCAiYXJ0X251bWJlciI6IDEsICJpbWFnZSI6ICJpcGZzOi8vIiwiaW1hZ2VfbGFyZ2UiOiAiaXBmczovLyIsImF0dHJpYnV0ZXMiOlt7InRyYWl0X3R5cGUiOiJTQU5EIiwidmFsdWUiOiJQQUxFLUdPTERFTiBTQU5EIn0seyJ0cmFpdF90eXBlIjoiV0FURVIiLCJ2YWx1ZSI6IkdSRUVOSVNIIFdBVEVSIn0seyJ0cmFpdF90eXBlIjoiV0FWRVMiLCJ2YWx1ZSI6IkdFTlRMRSBXQVZFUyJ9LHsidHJhaXRfdHlwZSI6IlNQQVJLTElORyIsInZhbHVlIjoiUklQUExFIn0seyJ0cmFpdF90eXBlIjoiTE9DQVRJT04iLCJ2YWx1ZSI6IkJPTkRJIEJFQUNILCBORVcgU09VVEggV0FMRVMifSx7InRyYWl0X3R5cGUiOiJGUkFNRSIsInZhbHVlIjoiQ1JFQU1ZIFdISVRFIn0seyJ0cmFpdF90eXBlIjoiRkVBVFVSRSIsInZhbHVlIjoiTk8ifSx7InRyYWl0X3R5cGUiOiJTSUdOIiwidmFsdWUiOiJOTyJ9XX0=";
+  "data:application/json;base64,eyJuYW1lIjogIkJlYWNoICMwIiwiZGVzY3JpcHRpb24iOiAiQkVBQ0giLCAidG9rZW5faWQiOiAwLCAiYXJ0X251bWJlciI6IDEsICJpbWFnZSI6ICJodHRwczovL2lwZnMuaW8vaXBmcy9RbWJFNFNBODJHa0tIRXRxeHhuWWp0TXdlTjFhM3g1ZTVVd2J6QVdVa05OM3ZrLzAucG5nIiwiaW1hZ2UiOiAiaHR0cHM6Ly9pcGZzLmlvL2lwZnMvUW1iRTRTQTgyR2tLSEV0cXh4bllqdE13ZU4xYTN4NWU1VXdiekFXVWtOTjN2ay8wX2xhcmdlLnBuZyIsImF0dHJpYnV0ZXMiOlt7InRyYWl0X3R5cGUiOiJTQU5EIiwidmFsdWUiOiJQQUxFLUdPTERFTiBTQU5EIn0seyJ0cmFpdF90eXBlIjoiV0FURVIiLCJ2YWx1ZSI6IkdSRUVOSVNIIFdBVEVSIn0seyJ0cmFpdF90eXBlIjoiV0FWRVMiLCJ2YWx1ZSI6IkdFTlRMRSBXQVZFUyJ9LHsidHJhaXRfdHlwZSI6IlNQQVJLTElORyIsInZhbHVlIjoiUklQUExFIn0seyJ0cmFpdF90eXBlIjoiTE9DQVRJT04iLCJ2YWx1ZSI6IkJPTkRJIEJFQUNILCBORVcgU09VVEggV0FMRVMifSx7InRyYWl0X3R5cGUiOiJGUkFNRSIsInZhbHVlIjoiQ1JFQU1ZIFdISVRFIn0seyJ0cmFpdF90eXBlIjoiRkVBVFVSRSIsInZhbHVlIjoiTk8ifSx7InRyYWl0X3R5cGUiOiJTSUdOIiwidmFsdWUiOiJOTyJ9XX0=";
 const revealedPathBase64JSONWithNameChange: string =
   "data:application/json;base64,eyJuYW1lIjogIkJlYWNoIEJPT00iLCJkZXNjcmlwdGlvbiI6ICJCRUFDSCIsICJ0b2tlbl9pZCI6IDAsICJhcnRfbnVtYmVyIjogMSwgImltYWdlIjogImh0dHBzOi8vaXBmcy5pby9pcGZzL1FtYkU0U0E4MkdrS0hFdHF4eG5ZanRNd2VOMWEzeDVlNVV3YnpBV1VrTk4zdmsvMC5wbmciLCJpbWFnZSI6ICJodHRwczovL2lwZnMuaW8vaXBmcy9RbWJFNFNBODJHa0tIRXRxeHhuWWp0TXdlTjFhM3g1ZTVVd2J6QVdVa05OM3ZrLzBfbGFyZ2UucG5nIiwiYXR0cmlidXRlcyI6W3sidHJhaXRfdHlwZSI6IlNBTkQiLCJ2YWx1ZSI6IlBBTEUtR09MREVOIFNBTkQifSx7InRyYWl0X3R5cGUiOiJXQVRFUiIsInZhbHVlIjoiR1JFRU5JU0ggV0FURVIifSx7InRyYWl0X3R5cGUiOiJXQVZFUyIsInZhbHVlIjoiR0VOVExFIFdBVkVTIn0seyJ0cmFpdF90eXBlIjoiU1BBUktMSU5HIiwidmFsdWUiOiJSSVBQTEUifSx7InRyYWl0X3R5cGUiOiJMT0NBVElPTiIsInZhbHVlIjoiQk9OREkgQkVBQ0gsIE5FVyBTT1VUSCBXQUxFUyJ9LHsidHJhaXRfdHlwZSI6IkZSQU1FIiwidmFsdWUiOiJDUkVBTVkgV0hJVEUifSx7InRyYWl0X3R5cGUiOiJGRUFUVVJFIiwidmFsdWUiOiJOTyJ9LHsidHJhaXRfdHlwZSI6IlNJR04iLCJ2YWx1ZSI6Ik5PIn1dfQ==";
 
 let DollarBeach;
 let dollarBeach: Contract;
+
+let creedAllowListParams: any[];
 
 function toWei(amount: number) {
   return BigNumber.from(amount).mul(BigNumber.from(10).pow(18));
@@ -233,7 +235,7 @@ describe("Beach NFT", function () {
 
     this.timeout(200000);
 
-    await mintMany(137, await multiSigOwner.getAddress(), beachNFT137);
+    // await mintMany(137, await multiSigOwner.getAddress(), beachNFT137);
     // await mintMany(317, await multiSigOwner.getAddress(), beachNFT317);
     // await mintMany(713, await multiSigOwner.getAddress(), beachNFT713);
   });
@@ -260,6 +262,13 @@ describe("Beach NFT", function () {
       [50, 25, 25]
     );
 
+    creedAllowListParams = [
+      beachNFT.address,
+      "BEACH",
+      DOLLLAR_BEACH_DROP_RATE,
+      true,
+    ];
+
     // Transfer ownership after deployment
     await beachNFT.transferOwnership(await multiSigOwner.getAddress());
   });
@@ -274,8 +283,8 @@ describe("Beach NFT", function () {
     });
 
     it("Should be able to reveal if owner", async function () {
-      await beachNFT.connect(multiSigOwner).reveal();
-      expect(await beachNFT.revealState(revealPath)).to.equal(true);
+      await beachNFT.connect(multiSigOwner).reveal(revealPath);
+      expect(await beachNFT.revealState()).to.equal(true);
     });
 
     it("Should not be able to reveal if not owner", async function () {
@@ -289,7 +298,7 @@ describe("Beach NFT", function () {
       await beachNFT.connect(multiSigOwner).reveal(revealPath);
       await expect(
         beachNFT.connect(multiSigOwner).reveal(revealPath)
-      ).to.be.revertedWith("B: _revealed already set");
+      ).to.be.revertedWith("B: already revealed");
     });
 
     it("Should point to default metadata until reveal", async function () {
@@ -342,7 +351,7 @@ describe("Beach NFT", function () {
           .setMetadata([0, 5], metadataMetadata.slice(0, 5));
 
         expect(await beachNFT.tokenURI(0)).to.equal(basePathBase64JSON);
-        await beachNFT.connect(multiSigOwner).reveal();
+        await beachNFT.connect(multiSigOwner).reveal(revealPath);
         expect(await beachNFT.tokenURI(0)).to.equal(
           revealedPathBase64JSONNoNameChange
         );
@@ -474,7 +483,7 @@ describe("Beach NFT", function () {
       }
     });
 
-    it("Should split the royalties following the correct ratio (real situation)", async function () {
+    xit("Should split the royalties following the correct ratio (real situation)", async function () {
       const amountReceived = 0.037; // Attempting to mint with Lobster at 2nd wave
       await beachNFT137
         .connect(address2)
@@ -494,7 +503,7 @@ describe("Beach NFT", function () {
       }
     });
 
-    it("Should withdraw the balances to accounts and reset account balance", async function () {
+    xit("Should withdraw the balances to accounts and reset account balance", async function () {
       // const amountReceived = 0.037; // Attempting to mint with Lobster at 2nd wave
       await beachNFT137
         .connect(address2)
@@ -594,7 +603,7 @@ describe("Beach NFT", function () {
       // Price is 0 for address1 (current owner) because it has 1 Lobster.
       await expect(
         beachNFTMint.connect(address1).gimmeBeaches(1, false, [])
-      ).to.be.revertedWith("B: Mint block is not ready");
+      ).to.be.revertedWith("B: Mint block not ready");
       await advanceBlocks(blocksUntilMintOpens);
       await beachNFTMint.connect(address1).gimmeBeaches(1, false, []);
       expect(
@@ -690,62 +699,55 @@ describe("Beach NFT", function () {
 
         await dollarBeach.connect(multiSigOwner).clearCreedAllowList();
 
-        // // Stake the one token
-        // await dollarBeach.connect(address2).stake(beachNFT.address, token0);
         //
         // // Wait (pass) 2 blocks
         // await advanceBlocks(MOVE_BY_X_BLOCKS);
       });
 
-      describe("Creed Management", async function () {
+      describe.only("Creed Management", async function () {
+        beforeEach(async function () {
+          // Return all to owners
+          await dollarBeach.connect(multiSigOwner).emergencyReturn();
+
+          await dollarBeach.connect(multiSigOwner).clearCreedAllowList();
+
+          await dollarBeach
+            .connect(multiSigOwner)
+            .modifyCreedAllowList(
+              creedAllowListParams[0],
+              creedAllowListParams[1],
+              creedAllowListParams[2],
+              creedAllowListParams[3]
+            );
+        });
+
         it("Should not allow staking a creed that wasn't allowed", async function () {
+          await dollarBeach.connect(multiSigOwner).clearCreedAllowList();
+
           await expect(
             dollarBeach.connect(address2).stake(beachNFT.address, token0)
           ).to.be.reverted;
         });
 
         it("Should allow staking a creed that was allowed", async function () {
-          // Once Beach has settled, setup allowList with proper rate
-          const creedAllowListParams = [
-            beachNFT.address,
-            "BEACH",
-            DOLLLAR_BEACH_DROP_RATE,
-            true,
-          ];
+          const myStakingIdsBefore = await dollarBeach
+            .connect(address2)
+            .getMyStakingIds();
+          console.log("My Staking IDs (before): ", myStakingIdsBefore);
 
-          await dollarBeach
-            .connect(multiSigOwner)
-            .modifyCreedAllowList(
-              creedAllowListParams[0],
-              creedAllowListParams[1],
-              creedAllowListParams[2],
-              creedAllowListParams[3]
-            );
           // Stake the one token
           await dollarBeach.connect(address2).stake(beachNFT.address, token0);
-          expect(
-            await dollarBeach.connect(address2).getMyStakingIds()
-          ).to.be.of.length(1);
+
+          const ownerOf0 = await dollarBeach.getStakingIdOwner(0);
+          console.log("Owner of 0: ", ownerOf0);
+          const myStakingIdsAfter = await dollarBeach
+            .connect(address2)
+            .getMyStakingIds();
+          console.log("My Staking IDs (after): ", myStakingIdsAfter);
+          expect(myStakingIdsAfter).to.be.of.length(1);
         });
 
         it("Should make sure that similar creeds are only in once", async function () {
-          await dollarBeach.connect(multiSigOwner).clearCreedAllowList();
-
-          const creedAllowListParams = [
-            beachNFT.address,
-            "BEACH",
-            DOLLLAR_BEACH_DROP_RATE,
-            true,
-          ];
-
-          await dollarBeach
-            .connect(multiSigOwner)
-            .modifyCreedAllowList(
-              creedAllowListParams[0],
-              creedAllowListParams[1],
-              creedAllowListParams[2],
-              creedAllowListParams[3]
-            );
           await dollarBeach
             .connect(multiSigOwner)
             .modifyCreedAllowList(
@@ -766,22 +768,6 @@ describe("Beach NFT", function () {
         });
 
         it("Should return proper enumeration for Creeds", async function () {
-          // await dollarBeach.connect(multiSigOwner).clearCreedAllowList();
-          const creedAllowListParams = [
-            beachNFT.address,
-            "BEACH",
-            DOLLLAR_BEACH_DROP_RATE,
-            true,
-          ];
-
-          await dollarBeach
-            .connect(multiSigOwner)
-            .modifyCreedAllowList(
-              creedAllowListParams[0],
-              creedAllowListParams[1],
-              creedAllowListParams[2],
-              creedAllowListParams[3]
-            );
           const isCreedAllowed = await dollarBeach
             .connect(multiSigOwner)
             .isCreedAllowed(beachNFT.address);
@@ -802,22 +788,6 @@ describe("Beach NFT", function () {
         });
 
         it("Should clear creeds", async function () {
-          const creedAllowListParams = [
-            beachNFT.address,
-            "BEACH",
-            DOLLLAR_BEACH_DROP_RATE,
-            true,
-          ];
-
-          await dollarBeach
-            .connect(multiSigOwner)
-            .modifyCreedAllowList(
-              creedAllowListParams[0],
-              creedAllowListParams[1],
-              creedAllowListParams[2],
-              creedAllowListParams[3]
-            );
-
           const isCreedAllowed = await dollarBeach
             .connect(multiSigOwner)
             .isCreedAllowed(beachNFT.address);
@@ -840,9 +810,25 @@ describe("Beach NFT", function () {
       });
 
       it("Should allow staking one NFT, transfers and starts staking properly", async function () {
+        await dollarBeach
+          .connect(multiSigOwner)
+          .modifyCreedAllowList(
+            creedAllowListParams[0],
+            creedAllowListParams[1],
+            creedAllowListParams[2],
+            creedAllowListParams[3]
+          );
+
+        // Stake the one token
+        await dollarBeach.connect(address2).stake(beachNFT.address, token0);
+
         const stakingIds = await dollarBeach
           .connect(address2)
           .getMyStakingIds();
+        expect(
+          await dollarBeach.getStakingIdOwner(stakingIds[0]),
+          "Address should match owner's"
+        ).to.equal(await address2.getAddress());
         expect(stakingIds, "StakingIds should be of size 1").to.be.of.length(1);
       });
 

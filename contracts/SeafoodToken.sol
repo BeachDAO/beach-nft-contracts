@@ -105,17 +105,18 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
   function stake(address creed_, uint tokenId_) public {
     uint[] memory myStakes_ = _getMyStakingInfo();
 
-    require(_creedAllowList[creed_].allowed == true, "SEAFOOD: This token is not allowed yet");
-    require(_getOwnerForCreedAndTokenId(creed_, tokenId_) == _msgSender(), "SEAFOOD: You do not own this token");
-    require(myStakes_.length < MAX_STAKING, "SEAFOOD: You already have too many items staked");
+    require(_creedAllowList[creed_].allowed == true, "S: This token is not allowed");
+    require(_getOwnerForCreedAndTokenId(creed_, tokenId_) == _msgSender(), "S: You do not own this token");
+    require(myStakes_.length < MAX_STAKING, "S: You already have too many items staked");
 
-    _transferTokenFromOwner(creed_, tokenId_, _msgSender());
+    address owner = _getOwnerForCreedAndTokenId(creed_, tokenId_);
+    _transferTokenFromOwner(creed_, tokenId_, owner);
 
     // Breaking init into multiple statements to optimize for gas
     Staking memory staking;
     staking.tokenId = tokenId_;
     staking.creed = creed_;
-    staking.owner = _msgSender();
+    staking.owner = owner;
     staking.startingBlock = block.number;
     staking.claimedAmount = 0;
 
@@ -221,10 +222,10 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     return currentHolder;
   }
 
-  function unstakeByCreedByTokenId(address creed, uint tokenId) external {
-    address holder_ = _getOwnerForCreedAndTokenId(creed, tokenId);
-    require(holder_ == _msgSender(), "SEAFOOD: You do not own this token");
-    uint stakingId_ = _stakingByCreed[creed][tokenId];
+  function unstakeByCreedByTokenId(address creed_, uint tokenId_) external {
+    address holder = _getOwnerForCreedAndTokenId(creed_, tokenId_);
+    require(holder == _msgSender() || _msgSender() == address(this) || _msgSender() == owner(), "S: You do not own this token");
+    uint stakingId_ = _stakingByCreed[creed_][tokenId_];
     _unstakeByStakingId(stakingId_);
   }
 
@@ -236,15 +237,15 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     }
   }
 
-  function _unstakeByStakingId(uint stakingId) private {
-    Staking memory staking_ = _stakings[stakingId];
-    require(staking_.owner == _msgSender(), "SEAFOOD: You do not own this token");
+  function _unstakeByStakingId(uint stakingId_) private {
+    Staking memory staking = _stakings[stakingId_];
+    require(staking.owner == _msgSender() || _msgSender() == address(this) || _msgSender() == owner(), "S: You do not own this token");
 
     // Claim existing funds onto your wallet balance, ready to be transferred
-    _freezeBalanceByStakingId(staking_.owner, stakingId);
-    _markAsClaimed(stakingId, true);
+    _freezeBalanceByStakingId(staking.owner, stakingId_);
+    _markAsClaimed(stakingId_, true);
 
-    _transferTokenBackToOwner(staking_.creed, staking_.owner, staking_.tokenId);
+    _transferTokenBackToOwner(staking.creed, staking.owner, staking.tokenId);
   }
 
   function _transferTokenBackToOwner(address creed_, address owner_, uint tokenId_) private {
@@ -255,6 +256,11 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     IERC721(creed_).safeTransferFrom(owner_, address(this), tokenId_);
   }
 
+  function getStakingIdOwner(uint stakingId_) public view returns (address) {
+    require(stakingId_ < _stakingId, "S: This ID doesn't exist");
+    return _stakings[stakingId_].owner;
+  }
+
   function returnTokensToOwners(uint[] calldata stakingIds_) external onlyOwner {
     for (uint i = 0; i < stakingIds_.length; i++) {
       address creed_ = _stakings[stakingIds_[i]].creed;
@@ -262,6 +268,14 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
       address owner_ = _getOwnerForCreedAndTokenId(creed_, tokenId_);
 
       _transferTokenBackToOwner(creed_, owner_, tokenId_);
+    }
+  }
+
+  function emergencyReturn() external onlyOwner {
+    for (uint i = 0; i < _stakingId; i++) {
+      if (_stakings[i].endingBlock == 0) {
+        _unstakeByStakingId(i);
+      }
     }
   }
 
