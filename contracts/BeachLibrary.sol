@@ -226,4 +226,31 @@ library BeachLibrary {
       )
     );
   }
+
+  function buildContractURI(address beach_) public view returns (string memory) {
+    return
+    string(
+      abi.encodePacked(
+        "data:application/json;base64,",
+        encode(
+          bytes(
+            string(
+              abi.encodePacked(
+                abi.encodePacked(
+                  '{',
+                  '"name": "B34CHDao",',
+                  '"description": "B34CHDao",',
+                  '"image": "https://openseacreatures.io/image.png"', // TODO: Finalize this
+                  '"external_link": "https://b34ch.xyz",',
+                  '"seller_fee_basis_points": 1000,',
+                  '"fee_recipient": "', beach_, '"',
+                  '}'
+                )
+              )
+            )
+          )
+        )
+      )
+    );
+  }
 }

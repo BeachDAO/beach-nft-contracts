@@ -52,6 +52,7 @@ const config: HardhatUserConfig = {
     },
     hardhat: {
       loggingEnabled: true,
+      allowUnlimitedContractSize: false,
     },
   },
   gasReporter: {

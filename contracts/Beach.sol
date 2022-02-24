@@ -157,7 +157,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   function contractURI() public view returns (string memory) {
-    return "https://metadata-url.com/my-metadata";
+    return BeachLibrary.buildContractURI(address(this));
   }
 
   /**

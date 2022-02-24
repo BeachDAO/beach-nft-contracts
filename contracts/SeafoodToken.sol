@@ -251,7 +251,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
 
     _transferTokenBackToOwner(staking.creed, staking.owner, staking.tokenId);
 
-    EnumerableSet.remove(_liveStakings, stakingId);
+    EnumerableSet.remove(_liveStakings, stakingId_);
   }
 
   function _transferTokenBackToOwner(address creed_, address owner_, uint tokenId_) private {
