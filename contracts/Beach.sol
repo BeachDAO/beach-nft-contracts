@@ -76,7 +76,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   // TODO: Add the waveListMerkleRoot
   bytes32 public waveListMerkleRoot = "";
   uint public MAX_SUPPLY = 1337;
-  string public provenance = "";
+  string public provenance = "e36178f2da4018955176de7fc70fa1fdc0dc0679f36d42f60d5a6cafe9691ba1";
 
   address private _lobster;
   address private _seafood;
@@ -339,24 +339,25 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   function getMyPriceForNextMint(bool isWaveList_) public view returns (uint) {
     uint lobsterBalance = resolveLobster(_msgSender());
+    bool getWaveListPrice = lobsterBalance >= 1 || isWaveList_;
 
     if (_tokenIdCounter < 137) {
-      if (lobsterBalance >= 1 || isWaveList_) {
+      if (getWaveListPrice) {
         return 0 ether;
       }
       return 1 ether;
     } else if (_tokenIdCounter >= 137 && _tokenIdCounter < 317) {
-      if (lobsterBalance >= 1 || isWaveList_) {
+      if (getWaveListPrice) {
         return 0.037 ether;
       }
       return 0.073 ether;
     } else if (_tokenIdCounter >= 317 && _tokenIdCounter < 713) {
-      if (lobsterBalance >= 1) {
+      if (getWaveListPrice) {
         return 0.073 ether;
       }
       return 0.1 ether;
     } else if (_tokenIdCounter >= 713) {
-      if (lobsterBalance >= 1) {
+      if (getWaveListPrice) {
         return 0.1 ether;
       }
       return 0.1337 ether;

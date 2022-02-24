@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
-import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @custom:security-contact nemb@hey.com
 contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownable {
@@ -46,10 +46,13 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
   bytes4 internal _onERC721ReceivedSelector = bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
 
   mapping(uint => Staking) private _stakings;
-  uint private _stakingId = 0;
+  uint private _stakingCounter = 0;
+
+  EnumerableSet.UintSet private _liveStakings;
 
   // By Creed contract Address by Creed TokenID
   mapping(address => mapping(uint => uint)) private _stakingByCreed;
+
   // By Owner Address by Staking ID
   mapping(address => uint[]) private _stakingsByOwner;
 
@@ -99,7 +102,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
    */
 
   function _reserveNextStakingId() internal returns (uint) {
-    return _stakingId++;
+    return _stakingCounter++;
   }
 
   function stake(address creed_, uint tokenId_) public {
@@ -126,8 +129,9 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     // TokenId by creed
     _stakingByCreed[creed_][tokenId_] = stakingId;
     // Adding to sender IDs
-    // TODO: Remove when unstaking
     _stakingsByOwner[_msgSender()].push(stakingId);
+
+    EnumerableSet.add(_liveStakings, stakingId);
   }
 
   function stakeByIds(address[] calldata creeds_, uint[] calldata tokensIds_) public {
@@ -246,6 +250,8 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     _markAsClaimed(stakingId_, true);
 
     _transferTokenBackToOwner(staking.creed, staking.owner, staking.tokenId);
+
+    EnumerableSet.remove(_liveStakings, stakingId);
   }
 
   function _transferTokenBackToOwner(address creed_, address owner_, uint tokenId_) private {
@@ -257,7 +263,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
   }
 
   function getStakingIdOwner(uint stakingId_) public view returns (address) {
-    require(stakingId_ < _stakingId, "S: This ID doesn't exist");
+    require(stakingId_ < _stakingCounter, "S: This ID doesn't exist");
     return _stakings[stakingId_].owner;
   }
 
@@ -272,18 +278,16 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
   }
 
   function emergencyReturn() external onlyOwner {
-    for (uint i = 0; i < _stakingId; i++) {
-      if (_stakings[i].endingBlock == 0) {
-        _unstakeByStakingId(i);
-      }
+    for (uint i = 0; i < EnumerableSet.length(_liveStakings); i++) {
+      _unstakeByStakingId(EnumerableSet.at(_liveStakings, i));
     }
   }
 
-  function isCreedAllowed(address creed_) public view onlyOwner returns (address, string memory, uint, bool) {
+  function isCreedAllowed(address creed_) public view returns (address, string memory, uint, bool) {
     return (_creedAllowList[creed_].creed, _creedAllowList[creed_].name, _creedAllowList[creed_].rate, _creedAllowList[creed_].allowed);
   }
 
-  function getAllCreeds() public view onlyOwner returns (Creed[] memory) {
+  function getAllCreeds() public view returns (Creed[] memory) {
     Creed[] memory allCreeds = new Creed[](_creedsAllowed.length);
 
     for (uint i = 0; i < _creedsAllowed.length; i++) {

@@ -704,7 +704,7 @@ describe("Beach NFT", function () {
         // await advanceBlocks(MOVE_BY_X_BLOCKS);
       });
 
-      describe.only("Creed Management", async function () {
+      describe("Creed Management", async function () {
         beforeEach(async function () {
           // Return all to owners
           await dollarBeach.connect(multiSigOwner).emergencyReturn();

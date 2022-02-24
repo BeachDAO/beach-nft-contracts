@@ -195,15 +195,6 @@ library BeachLibrary {
     return string(abi.encodePacked("[", metadataString, "]"));
   }
 
-  // tokenId_,
-  // beachName(tokenId_),
-  // _revealed,
-  // _baseURIPath,
-  // getRevealedPath(tokenId_),
-  // _placeholderURI,
-  // _TRAITS,
-  // _DICT,
-  // _beachMetadata
   function buildTokenURI(
     uint tokenId_,
     string memory beachName_,
