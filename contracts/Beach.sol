@@ -73,8 +73,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   string[2] private _revealedPath = ["", ""];
   bool private _freezeBasePath = false;
 
-  // TODO: Add the waveListMerkleRoot
-  bytes32 public waveListMerkleRoot = "";
+  bytes32 public waveListMerkleRoot;
   uint public MAX_SUPPLY = 1337;
   string public provenance = "e36178f2da4018955176de7fc70fa1fdc0dc0679f36d42f60d5a6cafe9691ba1";
 
@@ -107,10 +106,11 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   event Revealed();
   event NameChanged(string name);
 
-  constructor(address lobster_, uint blocksBeforeTheMint_) ERC721("B34CH DAO", "B34CH") {
+  constructor(address lobster_, uint blocksBeforeTheMint_, bytes32 waveListRoot_) ERC721("B34CH DAO", "B34CH") {
     _lobster = lobster_;
     _setDefaultRoyalty(address(this), 1000);
     _mintBlock = block.number + blocksBeforeTheMint_;
+    waveListMerkleRoot = waveListRoot_;
   }
 
   function setSeafood(address seafood_) external onlyOwner {
@@ -185,14 +185,14 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   function gimmeBeaches(uint8 count_, bool isWaveList_, bytes32[] calldata merkleProof_) external payable {
     require(block.number > _mintBlock, "B: Mint block not ready");
-    require(count_ <= 5, "B: MAX 5 beaches at once");
+    require(count_ > 0 && count_ <= 5, "B: MAX 5 beaches at once");
     require(balanceOf(_msgSender()) + count_ < 10, "B: Too many beaches");
 
     if (isWaveList_) {
       require(MerkleProof.verify(merkleProof_, waveListMerkleRoot, keccak256(abi.encodePacked(_msgSender()))), "B: Not found in waveList");
     }
 
-    require(msg.value == getMyPriceForNextMint(isWaveList_), "B: Minting amount incorrect");
+    require(msg.value == getMyPriceForNextMint(isWaveList_) * count_, "B: Minting amount incorrect");
 
     for (uint8 i = 0; i < count_; i++) {
       _mintABeach(_msgSender());
@@ -378,6 +378,9 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     require(_released[account_] == 0 || _balances[account_] == 0, "PS: Released or balances is non-0 for this account");
     require(_payees.length < 256, "PS: Too many shareholders");
 
+    // Flush outstanding balances to ensure that new payees don't mess things up
+    _splitOutstandingBalance();
+
     _payees.push(account_);
     _shares[account_] = shares_;
     _released[account_] = 0;
@@ -401,6 +404,9 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     require(account_ != address(0), "PS: Address can't be 0");
     require(_released[account_] > 0 || _balances[account_] > 0, "PS: Account doesn't exist");
     require(_totalShares - _shares[account_] + shares_ < 256, "PS: Max shares reached");
+
+    // Flush outstanding balances to ensure that new payees don't mess things up
+    _splitOutstandingBalance();
 
     uint8 sharesBefore = _shares[account_];
 
@@ -435,7 +441,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   function _splitOutstandingBalance() internal {
-    uint outstandingBalance = address(this).balance - _totalSplit;
+    uint outstandingBalance = address(this).balance - (_totalSplit - _amountReleased);
     _split(outstandingBalance);
   }
 
@@ -463,6 +469,10 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   function accountBalance(address account) public view onlyAccountOrOwner(account) returns (uint256) {
     return _balances[account];
+  }
+
+  function balanceAvailable() public view returns (uint256) {
+    return address(this).balance;
   }
 
   function totalReceived() public view returns (uint256) {

@@ -8,6 +8,8 @@ const fs = require("fs");
 // $ node --max-old-space-size=16384 createProvenanceHash.js /path/to/ipfs/files
 // You should get
 // Final hash:  e36178f2da4018955176de7fc70fa1fdc0dc0679f36d42f60d5a6cafe9691ba1
+// Keep in mind that it is going to fail if you set the heap memory to less than
+// 16Gb.
 
 const startTime = Date.now();
 

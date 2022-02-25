@@ -55,6 +55,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
 
   // By Owner Address by Staking ID
   mapping(address => uint[]) private _stakingsByOwner;
+  mapping(address => EnumerableSet.UintSet) private _liveStakingsByOwner;
 
   // Balance by owner
   mapping(address => Balance) private _balanceByOwner;
@@ -106,7 +107,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
   }
 
   function stake(address creed_, uint tokenId_) public {
-    uint[] memory myStakes_ = _getMyStakingInfo();
+    uint[] memory myStakes_ = _getMyStakingInfo(true);
 
     require(_creedAllowList[creed_].allowed == true, "S: This token is not allowed");
     require(_getOwnerForCreedAndTokenId(creed_, tokenId_) == _msgSender(), "S: You do not own this token");
@@ -132,6 +133,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     _stakingsByOwner[_msgSender()].push(stakingId);
 
     EnumerableSet.add(_liveStakings, stakingId);
+    EnumerableSet.add(_liveStakingsByOwner[_msgSender()], stakingId);
   }
 
   function stakeByIds(address[] calldata creeds_, uint[] calldata tokensIds_) public {
@@ -141,8 +143,12 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     }
   }
 
-  function _getMyStakingInfo() private view returns (uint[] memory) {
-    return _stakingsByOwner[_msgSender()];
+  function _getMyStakingInfo(bool liveOnly) private view returns (uint[] memory) {
+    if (liveOnly) {
+      return EnumerableSet.values(_liveStakingsByOwner[_msgSender()]);
+    } else {
+      return _stakingsByOwner[_msgSender()];
+    }
   }
 
   function _getBalanceForStakingId(uint stakingId_) private view returns (uint) {
@@ -157,12 +163,12 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     return balance;
   }
 
-  function getMyStakingIds() public view returns (uint[] memory) {
-    return _getMyStakingInfo();
+  function getMyStakingIds(bool liveOnly) public view returns (uint[] memory) {
+    return _getMyStakingInfo(liveOnly);
   }
 
   function getMyStakingBalance() public view returns (uint) {
-    uint[] memory stakingIds = _getMyStakingInfo();
+    uint[] memory stakingIds = _getMyStakingInfo(false);
     uint balance = 0;
 
     for (uint i = 0; i < stakingIds.length; i++) {
@@ -175,7 +181,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
   }
 
   function claimAll(bool close) external {
-    uint[] memory myStakingsIds = _getMyStakingInfo();
+    uint[] memory myStakingsIds = _getMyStakingInfo(false);
 
     _freezeBalance(_msgSender());
     uint balance = _balanceByOwner[_msgSender()].claimableAmount;
@@ -234,10 +240,12 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
   }
 
   function unstakeAll() external {
-    uint[] memory myStakings_ = _getMyStakingInfo();
+    uint[] memory myStakings_ = _getMyStakingInfo(true);
 
     for (uint i = 0; i < myStakings_.length; i++) {
-      _unstakeByStakingId(myStakings_[i]);
+      if (EnumerableSet.contains(_liveStakings, myStakings_[i])) {
+        _unstakeByStakingId(myStakings_[i]);
+      }
     }
   }
 
@@ -252,6 +260,7 @@ contract SeafoodToken is ERC20, ERC20Burnable, IERC721Receiver, Pausable, Ownabl
     _transferTokenBackToOwner(staking.creed, staking.owner, staking.tokenId);
 
     EnumerableSet.remove(_liveStakings, stakingId_);
+    EnumerableSet.remove(_liveStakingsByOwner[staking.owner], stakingId_);
   }
 
   function _transferTokenBackToOwner(address creed_, address owner_, uint tokenId_) private {

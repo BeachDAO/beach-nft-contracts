@@ -238,8 +238,8 @@ library BeachLibrary {
               abi.encodePacked(
                 abi.encodePacked(
                   '{',
-                  '"name": "B34CHDao",',
-                  '"description": "B34CHDao",',
+                  '"name": "B34CH DAO",',
+                  '"description": "B34CH DAO",',
                   '"image": "https://openseacreatures.io/image.png"', // TODO: Finalize this
                   '"external_link": "https://b34ch.xyz",',
                   '"seller_fee_basis_points": 1000,',
