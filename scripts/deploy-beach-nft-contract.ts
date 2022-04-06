@@ -16,6 +16,16 @@ const metadataMetadata = JSON.parse(
   fs.readFileSync("./metadata/dist/metadataToUpload.json")
 );
 const DICT = fs.readFileSync("./metadata/dist/metadataDictionary.json");
+const TRAITS = [
+  "SAND",
+  "WATER",
+  "WAVES",
+  "SPARKLING",
+  "LOCATION",
+  "FRAME",
+  "FEATURE",
+  "SIGN",
+];
 
 // @ts-ignore
 async function main() {
@@ -24,8 +34,6 @@ async function main() {
   console.log("Deploying contracts with the account:", deployer.address);
 
   let addressArt, addressDev, addressDAO;
-  let accounts;
-  let shares;
   let lobsterAddress;
   let blocksBeforeMintOpens;
 
@@ -53,25 +61,23 @@ async function main() {
     // addressDAO = process.env.ADDRESSES_DAO_MAINNET;
   }
 
-  accounts = [addressArt, addressDev, addressDAO];
-  shares = [50, 25, 25];
+  const accounts = [addressArt, addressDev, addressDAO];
+  const shares = [50, 25, 25];
 
   console.log("Deploying");
-  console.log(lobsterAddress, accounts, shares, blocksBeforeMintOpens);
+  console.log(lobsterAddress, blocksBeforeMintOpens, TRAITS);
 
   const Beach = await hre.ethers.getContractFactory("Beach");
   const beach = await Beach.deploy(
     lobsterAddress,
-    "0xF7FE3618A16A8f98198584B046FDbc3D0C2786c5",
-    accounts,
-    shares,
-    blocksBeforeMintOpens
+    blocksBeforeMintOpens,
+    TRAITS
   );
 
   await beach.deployed();
-  console.log("Beach deployed to:", beach.address);
+  await beach.addPayeesBatch(accounts, shares);
 
-  // TODO: Transfer Ownership to DAO address
+  console.log("Beach deployed to:", beach.address);
 
   await beach.setDict(DICT);
   await beach.setMetadata([0, 5], metadataMetadata.slice(0, 5));

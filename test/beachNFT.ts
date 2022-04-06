@@ -4,14 +4,13 @@ import { expect } from "chai";
 import { BigNumber, Contract } from "ethers";
 import { ethers } from "hardhat";
 // eslint-disable-next-line node/no-missing-import
-import { Beach } from "../typechain";
-// import { BigNumber } from "ethers";
+import { Beach, Beach__factory } from "../typechain";
 
 const fs = require("fs");
 
 const hre = require("hardhat");
 
-let BeachNFT;
+let BeachNFT: Beach__factory;
 let LobsterMockContract;
 let BeachLibraryContract;
 let beachLibrary;
@@ -28,7 +27,8 @@ let multiSigOwner: Signer,
   address3: Signer,
   addressArt: Signer,
   addressDev: Signer,
-  addressDAO: Signer;
+  addressDAO: Signer,
+  addressSupply: Signer;
 
 const royaltiesSharesSplit = [50, 25, 25]; // Art, Dev, DAO
 const totalShares = royaltiesSharesSplit.reduce(
@@ -51,11 +51,23 @@ const priceOverride1 = {
   value: ethers.utils.parseEther("1"),
 };
 
-const blocksUntilMintOpens = 300;
+const blocksUntilMintOpens = 3000;
 
 const metadataMetadata = JSON.parse(
   fs.readFileSync("./metadata/dist/metadataToUpload.json")
 );
+
+const TRAITS = [
+  "SAND",
+  "WATER",
+  "WAVES",
+  "SPARKLING",
+  "LOCATION",
+  "FRAME",
+  "FEATURE",
+  "SIGN",
+];
+
 const DICT = JSON.parse(
   fs.readFileSync("./metadata/dist/metadataDictionary.json")
 );
@@ -144,7 +156,11 @@ function toWei(amount: number) {
 
 const DOLLLAR_BEACH_DROP_RATE = BigNumber.from(152_788_388_082_506).mul(5);
 
+const MAX_SUPPLY = 1337;
+
 describe("Beach NFT", function () {
+  this.timeout(300000);
+
   // *** ERC721 / Minting ***
   //
   // [x] Should have a limit of 1337 max supply
@@ -230,6 +246,7 @@ describe("Beach NFT", function () {
       addressArt,
       addressDev,
       addressDAO,
+      addressSupply,
     ] = await hre.ethers.getSigners();
 
     royaltiesAccountsSigners = [addressArt, addressDev, addressDAO];
@@ -264,14 +281,14 @@ describe("Beach NFT", function () {
       },
     });
 
-    beachNFT137 = await BeachNFT.deploy(lobsterMock.address, 0, waveListRoot);
-    beachNFT317 = await BeachNFT.deploy(lobsterMock.address, 0, waveListRoot);
-    beachNFT713 = await BeachNFT.deploy(lobsterMock.address, 0, waveListRoot);
+    beachNFT137 = await BeachNFT.deploy(lobsterMock.address, 0, TRAITS);
+    beachNFT317 = await BeachNFT.deploy(lobsterMock.address, 0, TRAITS);
+    beachNFT713 = await BeachNFT.deploy(lobsterMock.address, 0, TRAITS);
 
     beachNFTMint = await BeachNFT.deploy(
       lobsterMock.address,
       blocksUntilMintOpens,
-      waveListRoot
+      TRAITS
     );
 
     await beachNFT137.deployed();
@@ -280,21 +297,27 @@ describe("Beach NFT", function () {
     await beachNFTMint.deployed();
 
     await beachNFT137.setSeafood(dollarBeach.address);
+    await beachNFT137.setMerkleRoot(waveListRoot);
     await beachNFT137.addPayeesBatch(royaltiesAccounts, royaltiesSharesSplit);
-    await beachNFT317.setSeafood(dollarBeach.address);
+    // Not setting this so we can test that setName is free until $seafood is set
+    // await beachNFT317.setSeafood(dollarBeach.address);
+    await beachNFT317.setMerkleRoot(waveListRoot);
     await beachNFT317.addPayeesBatch(royaltiesAccounts, royaltiesSharesSplit);
     await beachNFT713.setSeafood(dollarBeach.address);
+    await beachNFT713.setMerkleRoot(waveListRoot);
     await beachNFT713.addPayeesBatch(royaltiesAccounts, royaltiesSharesSplit);
     await beachNFTMint.setSeafood(dollarBeach.address);
+    await beachNFTMint.setMerkleRoot(waveListRoot);
     await beachNFTMint.addPayeesBatch(royaltiesAccounts, royaltiesSharesSplit);
 
-    this.timeout(200000);
+    this.timeout(300000);
 
     await mintMany(137, await multiSigOwner.getAddress(), beachNFT137);
-    // await mintMany(317, await multiSigOwner.getAddress(), beachNFT317);
+    await mintMany(317, await multiSigOwner.getAddress(), beachNFT317);
     // await mintMany(713, await multiSigOwner.getAddress(), beachNFT713);
 
     await beachNFT137.transferOwnership(await multiSigOwner.getAddress());
+    await beachNFT317.transferOwnership(await multiSigOwner.getAddress());
   });
 
   beforeEach(async function () {
@@ -306,10 +329,11 @@ describe("Beach NFT", function () {
         BeachLibrary: beachLibrary.address,
       },
     });
-    beachNFT = await BeachNFT.deploy(lobsterMock.address, 0, waveListRoot);
+    beachNFT = await BeachNFT.deploy(lobsterMock.address, 0, TRAITS);
 
     await beachNFT.deployed();
     await beachNFT.setSeafood(dollarBeach.address);
+    await beachNFT.setMerkleRoot(waveListRoot);
     await beachNFT.addPayeesBatch(
       [
         await addressArt.getAddress(),
@@ -331,8 +355,50 @@ describe("Beach NFT", function () {
   });
 
   describe("NFT", async function () {
-    it("Should have a supply limit to 1337", async function () {
-      expect(await beachNFT.MAX_SUPPLY()).to.equal(1337);
+    describe("Supply", function () {
+      it("Should have a supply limit to 1337", async function () {
+        expect(await beachNFT.MAX_SUPPLY()).to.equal(MAX_SUPPLY);
+      });
+
+      xit("Should not allow minting more than 1337 NFTs", async function () {
+        // Deploy a new contract to max supply
+        const beachSupplyNFT = await BeachNFT.deploy(
+          lobsterMock.address,
+          0,
+          TRAITS
+        );
+
+        await beachSupplyNFT.deployed();
+        await beachSupplyNFT.setSeafood(dollarBeach.address);
+        await beachSupplyNFT.setMerkleRoot(waveListRoot);
+        await beachSupplyNFT.addPayeesBatch(
+          [
+            await addressArt.getAddress(),
+            await addressDev.getAddress(),
+            await addressDAO.getAddress(),
+          ],
+          [50, 25, 25]
+        );
+
+        // Transfer ownership after deployment
+        await beachSupplyNFT.transferOwnership(
+          await multiSigOwner.getAddress()
+        );
+
+        for (let x = 0; x < 1337; x++) {
+          // Use safeMint as a trick to test this
+          await beachSupplyNFT
+            .connect(multiSigOwner)
+            .safeMint(await addressSupply.getAddress());
+        }
+
+        expect(await beachSupplyNFT.totalSupply()).to.equal(MAX_SUPPLY);
+        await expect(
+          beachSupplyNFT
+            .connect(multiSigOwner)
+            .safeMint(await addressSupply.getAddress())
+        ).to.be.reverted;
+      });
     });
 
     it("Should be unrevealed by default", async function () {
@@ -373,8 +439,8 @@ describe("Beach NFT", function () {
         await beachNFT.connect(multiSigOwner).setDict(DICT);
       });
 
-      xit("Should set all metadata correctly", async function () {
-        this.timeout(200000);
+      it("Should set all metadata correctly", async function () {
+        this.timeout(300000);
 
         await beachNFT
           .connect(multiSigOwner)
@@ -419,9 +485,7 @@ describe("Beach NFT", function () {
           .connect(multiSigOwner)
           .setMetadata([0, 5], metadataMetadata.slice(0, 5));
 
-        await beachNFT
-          .connect(address3)
-          .gimmeBeaches(1, false, [], priceOverride1);
+        await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
         // Transfer enough SEAFOOD to set name
         await dollarBeach
           .connect(multiSigOwner)
@@ -439,7 +503,7 @@ describe("Beach NFT", function () {
 
     it("Should have a first index of 0", async function () {
       // Should equal 0 when nothing has been minted
-      expect(await beachNFT.currentTokenId()).to.equal(0);
+      expect(await beachNFT.totalSupply()).to.equal(0);
     });
 
     it("Should increment by 1 for each mint (safeMint)", async function () {
@@ -447,7 +511,7 @@ describe("Beach NFT", function () {
       await beachNFT
         .connect(multiSigOwner)
         .safeMint(await address1.getAddress());
-      expect(await beachNFT.currentTokenId()).to.equal(1);
+      expect(await beachNFT.totalSupply()).to.equal(1);
     });
 
     it("Should have correct totalSupply()", async function () {
@@ -466,13 +530,24 @@ describe("Beach NFT", function () {
       expect(await beachNFT.beachName(0)).to.equal("Beach #0");
     });
 
+    it("Setting a name should be free is $SEAFOOD contract hasn't been set", async function () {
+      await beachNFT317
+        .connect(multiSigOwner)
+        .safeMint(await multiSigOwner.getAddress());
+      const id = (await beachNFT317.connect(multiSigOwner).totalSupply()) - 1;
+      await beachNFT317.connect(multiSigOwner).setName(id, "SUP");
+
+      expect(await beachNFT317.beachName(id)).to.equal("Beach SUP");
+    });
+
     it("Should be able to transfer NFT", async function () {
       const address1address = await address3.getAddress();
       const address3address = await address3.getAddress();
-      await beachNFT
-        .connect(address3)
-        .gimmeBeaches(1, false, [], priceOverride1);
-      expect(await beachNFT.ownerOf(0)).to.equal(address3address);
+      await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
+      expect(
+        await beachNFT.ownerOf((await beachNFT.totalSupply()) - 1),
+        "Owner of the latest NFT should be the minter"
+      ).to.equal(address3address);
       await beachNFT
         .connect(address3)
         .transferFrom(address3address, address1address, 0);
@@ -497,7 +572,7 @@ describe("Beach NFT", function () {
     });
   });
 
-  describe.only("Lobsters", async function () {
+  describe("Lobsters", async function () {
     it("Should resolve LobsterMock balance", async function () {
       expect(
         await beachNFT.resolveLobster(await address1.getAddress())
@@ -509,6 +584,19 @@ describe("Beach NFT", function () {
         await beachNFT.resolveLobster(await address3.getAddress())
       ).to.equal(0);
     });
+  });
+
+  describe("DAO Functions", async function () {
+    it("Show allow withdraw all ETH funds from the smart contract", async function () {
+      await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
+      await beachNFT.connect(multiSigOwner).withdrawEthFunds();
+      expect(
+        await beachNFT.balanceAvailable(),
+        "All amounts should have been withdrawn"
+      ).to.equal(0);
+    });
+
+    // TODO: Test ERC20 withdrawals
   });
 
   describe("Royalties at mint time", async function () {
@@ -524,9 +612,7 @@ describe("Beach NFT", function () {
     }
 
     it("Should increase the smart contract balance properly", async function () {
-      await beachNFT
-        .connect(address3)
-        .gimmeBeaches(1, false, [], priceOverride1);
+      await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
 
       await beachNFT.connect(multiSigOwner).split();
 
@@ -536,9 +622,7 @@ describe("Beach NFT", function () {
     });
 
     it("Should handle splitting correctly", async function () {
-      await beachNFT
-        .connect(address3)
-        .gimmeBeaches(1, false, [], priceOverride1);
+      await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
 
       await beachNFT.connect(multiSigOwner).split();
       await beachNFT.connect(multiSigOwner).split();
@@ -550,9 +634,7 @@ describe("Beach NFT", function () {
 
     it("Should split the royalties following the correct ratio (artificial)", async function () {
       const amountReceived = 1;
-      await beachNFT
-        .connect(address3)
-        .gimmeBeaches(1, false, [], priceOverride1);
+      await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
 
       await beachNFT.connect(multiSigOwner).split();
 
@@ -575,7 +657,7 @@ describe("Beach NFT", function () {
 
       await beachNFT137
         .connect(address2)
-        .gimmeBeaches(1, false, [], priceOverride0037);
+        .gimmeBeaches(1, [], priceOverride0037);
 
       await beachNFT137.connect(multiSigOwner).split();
 
@@ -596,9 +678,9 @@ describe("Beach NFT", function () {
     it("Should withdraw the balances to accounts and reset account balance", async function () {
       await beachNFT137
         .connect(address2)
-        .gimmeBeaches(1, false, [], priceOverride0037);
+        .gimmeBeaches(1, [], priceOverride0037);
 
-      await beachNFT.connect(multiSigOwner).split();
+      await beachNFT137.connect(multiSigOwner).split();
 
       // At this point, each account balance should have the right split
       for (let i = 0; i < royaltiesAccounts.length; i++) {
@@ -609,17 +691,17 @@ describe("Beach NFT", function () {
         const actualBalance = await royaltiesAccountsSigners[i].getBalance();
 
         expect(actualBalance.gt(ethers.utils.parseEther("0"))).to.be.ok;
-        expect(await beachNFT137.accountBalance(royaltiesAccounts[i])).to.equal(
-          ethers.utils.parseEther("0")
-        );
+        expect(
+          await beachNFT137
+            .connect(multiSigOwner)
+            .accountBalance(royaltiesAccounts[i])
+        ).to.equal(ethers.utils.parseEther("0"));
       }
     });
 
     it("Should only be withdraw-able (to an account) by the owner or the account itself when there is a balance", async function () {
       // Create a balance
-      await beachNFT
-        .connect(address3)
-        .gimmeBeaches(1, false, [], priceOverride1);
+      await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
       await beachNFT.connect(multiSigOwner).split();
       expect(
         await beachNFT
@@ -642,7 +724,7 @@ describe("Beach NFT", function () {
 
       await beachNFT137
         .connect(address2)
-        .gimmeBeaches(5, false, [], priceOverride0037x5);
+        .gimmeBeaches(5, [], priceOverride0037x5);
 
       await beachNFT137.connect(multiSigOwner).split();
 
@@ -708,7 +790,7 @@ describe("Beach NFT", function () {
 
       await beachNFT137
         .connect(address1)
-        .gimmeBeaches(3, false, [], priceOverride0037x3);
+        .gimmeBeaches(3, [], priceOverride0037x3);
 
       await beachNFT137.connect(multiSigOwner).split();
 
@@ -727,7 +809,7 @@ describe("Beach NFT", function () {
 
       await beachNFT137
         .connect(address1)
-        .gimmeBeaches(3, false, [], priceOverride0037x3);
+        .gimmeBeaches(3, [], priceOverride0037x3);
 
       await beachNFT137.connect(multiSigOwner).split();
 
@@ -772,7 +854,7 @@ describe("Beach NFT", function () {
 
         await beachNFT137
           .connect(address2)
-          .gimmeBeaches(3, false, [], priceOverride0037x3);
+          .gimmeBeaches(1, [], priceOverride0037);
         await beachNFT137.connect(multiSigOwner).addPayee(multiSigAddress, 25);
 
         amountExpected = ethers.utils.parseEther("0");
@@ -787,13 +869,13 @@ describe("Beach NFT", function () {
 
         await beachNFT137
           .connect(address2)
-          .gimmeBeaches(3, false, [], priceOverride0037x3);
+          .gimmeBeaches(1, [], priceOverride0037);
 
         await beachNFT137.connect(multiSigOwner).split();
 
         amountExpected = amountReceived(
           0.037,
-          3,
+          1,
           25,
           totalShares + 25
         ).toString();
@@ -807,8 +889,8 @@ describe("Beach NFT", function () {
         ).to.equal(ethers.utils.parseEther(amountExpected));
 
         amountExpected = (
-          amountReceived(0.037, 3, 50, totalShares) +
-          amountReceived(0.037, 3, 50, totalShares + 25)
+          amountReceived(0.037, 1, 50, totalShares) +
+          amountReceived(0.037, 1, 50, totalShares + 25)
         ).toString();
         accountBalance = await beachNFT137
           .connect(multiSigOwner)
@@ -826,7 +908,7 @@ describe("Beach NFT", function () {
 
         await beachNFT137
           .connect(address2)
-          .gimmeBeaches(3, false, [], priceOverride0037x3);
+          .gimmeBeaches(1, [], priceOverride0037);
         await beachNFT137.connect(multiSigOwner).addPayee(multiSigAddress, 25);
 
         amountExpected = ethers.utils.parseEther("0");
@@ -841,13 +923,13 @@ describe("Beach NFT", function () {
 
         await beachNFT137
           .connect(address2)
-          .gimmeBeaches(3, false, [], priceOverride0037x3);
+          .gimmeBeaches(1, [], priceOverride0037);
 
         await beachNFT137.connect(multiSigOwner).split();
 
         amountExpected = amountReceived(
           0.037,
-          3,
+          1,
           25,
           totalShares + 25
         ).toString();
@@ -861,8 +943,8 @@ describe("Beach NFT", function () {
         ).to.equal(ethers.utils.parseEther(amountExpected));
 
         amountExpected = (
-          amountReceived(0.037, 3, 50, totalShares) +
-          amountReceived(0.037, 3, 50, totalShares + 25)
+          amountReceived(0.037, 1, 50, totalShares) +
+          amountReceived(0.037, 1, 50, totalShares + 25)
         ).toString();
         accountBalance = await beachNFT137
           .connect(multiSigOwner)
@@ -875,27 +957,27 @@ describe("Beach NFT", function () {
 
         await beachNFT137
           .connect(address1)
-          .gimmeBeaches(3, false, [], priceOverride0037x3);
+          .gimmeBeaches(1, [], priceOverride0037);
         await beachNFT137
           .connect(multiSigOwner)
           .updatePayee(multiSigAddress, 50);
         await beachNFT137
           .connect(address1)
-          .gimmeBeaches(3, false, [], priceOverride0037x3);
+          .gimmeBeaches(1, [], priceOverride0037);
         await beachNFT137
           .connect(multiSigOwner)
           .updatePayee(royaltiesAccounts[0], 25);
         await beachNFT137
           .connect(address1)
-          .gimmeBeaches(3, false, [], priceOverride0037x3);
+          .gimmeBeaches(1, [], priceOverride0037);
 
         await beachNFT137.connect(multiSigOwner).split();
 
         amountExpected = (
-          amountReceived(0.037, 3, 25, totalShares + 25) +
-          amountReceived(0.037, 3, 25, totalShares + 25) +
-          amountReceived(0.037, 3, 50, totalShares + 50) +
-          amountReceived(0.037, 3, 50, totalShares + 50 - 25)
+          amountReceived(0.037, 1, 25, totalShares + 25) +
+          amountReceived(0.037, 1, 25, totalShares + 25) +
+          amountReceived(0.037, 1, 50, totalShares + 50) +
+          amountReceived(0.037, 1, 50, totalShares + 50 - 25)
         ).toString();
         accountBalance = await beachNFT137
           .connect(multiSigOwner)
@@ -907,14 +989,13 @@ describe("Beach NFT", function () {
         ).to.equal(ethers.utils.parseEther(amountExpected));
       });
 
-      it.only("Should withdraw all funds from the Smart Contract balance if all shareholders release", async function () {
+      it("Should withdraw all funds from the Smart Contract balance if all shareholders release", async function () {
         await beachNFT137
           .connect(address3)
           .gimmeBeaches(
-            3,
-            true,
+            1,
             findAddressAndProofsInMerkleList(await address3.getAddress()),
-            priceOverride0037x3
+            priceOverride0037
           );
         await beachNFT137.connect(multiSigOwner).split();
         await beachNFT137.connect(multiSigOwner).release(royaltiesAccounts[0]);
@@ -934,15 +1015,23 @@ describe("Beach NFT", function () {
         await address1.getAddress()
       );
       // Attempt to mint for free since it is in the waveList
-      await expect(
-        beachNFT.connect(address1).gimmeBeaches(1, true, address1Proofs)
-      ).to.not.be.reverted;
+      await expect(beachNFT.connect(address1).gimmeBeaches(1, address1Proofs))
+        .to.not.be.reverted;
+    });
+
+    it("Should return true to amIWaveListed for addresses in the list", async function () {
+      const address1Proofs = findAddressAndProofsInMerkleList(
+        await address1.getAddress()
+      );
+
+      await expect(beachNFT.connect(address1).amIWaveListed(address1Proofs)).to
+        .be.ok;
     });
 
     it("Should reject the wavelist for addresses NOT in the list", async function () {
       await expect(
-        beachNFT.connect(addressArt).gimmeBeaches(1, true, [])
-      ).to.be.revertedWith("B: Not found in waveList");
+        beachNFT.connect(addressArt).gimmeBeaches(1, [])
+      ).to.be.revertedWith("B: Minting amount incorrect");
     });
 
     it("Should reject the wavelist for incorrect addresses providing incorrect proofs", async function () {
@@ -951,44 +1040,47 @@ describe("Beach NFT", function () {
       );
       // Attempt to mint for free since it is in the waveList
       await expect(
-        beachNFT.connect(addressDAO).gimmeBeaches(1, true, address1Proofs)
-      ).to.be.revertedWith("B: Not found in waveList");
+        beachNFT.connect(addressDAO).gimmeBeaches(1, address1Proofs)
+      ).to.be.revertedWith("B: Minting amount incorrect");
     });
 
-    it("Should reject the wavelist for correct addresses providing incorrect proofs", async function () {
-      const address1Proofs = findAddressAndProofsInMerkleList(
-        await address1.getAddress()
-      );
-      // Attempt to mint for free since it is in the waveList
-      await expect(
-        beachNFT.connect(address2).gimmeBeaches(1, true, address1Proofs)
-      ).to.be.revertedWith("B: Not found in waveList");
-    });
+    // We don't reject empty or wrong waveList merkleProofs anymore but only apply
+    // discount price if valid. Anyone can check if they are in the waveList via
+    // amIWaveListed()
+    // it("Should reject the wavelist for correct addresses providing incorrect proofs", async function () {
+    //   const address1Proofs = findAddressAndProofsInMerkleList(
+    //     await address1.getAddress()
+    //   );
+    //   // Attempt to mint for free since it is in the waveList
+    //   await expect(
+    //     beachNFT.connect(address2).gimmeBeaches(1, address1Proofs)
+    //   ).to.be.revertedWith("B: Not found in waveList");
+    // });
   });
 
   describe("Pricing", async function () {
     describe("Lobster owners", async function () {
       it("Should return free (0) if I have Lobsters and the current wave is the first wave", async function () {
         expect(
-          await beachNFT.connect(address1).getMyPriceForNextMint(false)
+          await beachNFT.connect(address1).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0"));
       });
 
       xit("Should return 0.037 ether if I have 1 Lobsters or more and the current wave is the second wave", async function () {
         expect(
-          await beachNFT137.connect(address2).getMyPriceForNextMint(false)
+          await beachNFT137.connect(address2).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.037"));
       });
 
       xit("Should return 0.073 ether if I have Lobsters and the current wave is the third wave", async function () {
         expect(
-          await beachNFT317.connect(address1).getMyPriceForNextMint(false)
+          await beachNFT317.connect(address1).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.073"));
       });
 
       xit("Should return 0.1 ether if I have Lobsters and the current wave is the fourth wave", async function () {
         expect(
-          await beachNFT713.connect(address1).getMyPriceForNextMint(false)
+          await beachNFT713.connect(address1).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.1"));
       });
     });
@@ -996,25 +1088,25 @@ describe("Beach NFT", function () {
     describe("NON Lobster owners", async function () {
       it("Should return 1 ether if I have Lobsters and the current wave is the first wave", async function () {
         expect(
-          await beachNFT.connect(address3).getMyPriceForNextMint(false)
+          await beachNFT.connect(address3).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("1"));
       });
 
       xit("Should return 0.037 ether if I have Lobsters and the current wave is the second wave", async function () {
         expect(
-          await beachNFT137.connect(address3).getMyPriceForNextMint(false)
+          await beachNFT137.connect(address3).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.073"));
       });
 
       xit("Should return 0.073 ether if I have Lobsters and the current wave is the third wave", async function () {
         expect(
-          await beachNFT317.connect(address3).getMyPriceForNextMint(false)
+          await beachNFT317.connect(address3).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.1"));
       });
 
       xit("Should return 0.1 ether if I have Lobsters and the current wave is the fourth wave", async function () {
         expect(
-          await beachNFT713.connect(address3).getMyPriceForNextMint(false)
+          await beachNFT713.connect(address3).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.1337"));
       });
     });
@@ -1024,17 +1116,17 @@ describe("Beach NFT", function () {
     it("Should only mint passed a certain block time", async function () {
       // Price is 0 for address1 (current owner) because it has 1 Lobster.
       await expect(
-        beachNFTMint.connect(address1).gimmeBeaches(1, false, [])
+        beachNFTMint.connect(address1).gimmeBeaches(1, [])
       ).to.be.revertedWith("B: Mint block not ready");
       await advanceBlocks(blocksUntilMintOpens);
-      await beachNFTMint.connect(address1).gimmeBeaches(1, false, []);
+      await beachNFTMint.connect(address1).gimmeBeaches(1, []);
       expect(
         await beachNFTMint.balanceOf(await address1.getAddress())
       ).to.equal(1);
     });
   });
 
-  describe("SEAFOOD ERC20", function () {
+  xdescribe("SEAFOOD ERC20", function () {
     //
     // **** ERC20 ****
     //
@@ -1104,7 +1196,7 @@ describe("Beach NFT", function () {
 
       beforeEach(async function () {
         // Mint 1 NFT
-        await beachNFT.connect(address2).gimmeBeaches(5, false, []);
+        await beachNFT.connect(address2).gimmeBeaches(5, []);
 
         // Approve staking contract
         await beachNFT

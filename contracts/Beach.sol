@@ -66,7 +66,6 @@ interface ISeafood {
 }
 
 contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
-  uint private _tokenIdCounter = 0;
   bool private _revealed = false;
   string private _baseURIPath = "https://ipfs.io/ipfs/";
   string private _placeholderURI = "QmZc5HkKqUf1UiL9xqpanvbETB83Ter21AqMRUo1mbv9PN";
@@ -75,6 +74,8 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   bytes32 public waveListMerkleRoot;
   uint public MAX_SUPPLY = 1337;
+  uint public MAX_PER_WALLET = 5;
+  uint public MAX_PER_TX = 3;
   string public provenance = "e36178f2da4018955176de7fc70fa1fdc0dc0679f36d42f60d5a6cafe9691ba1";
 
   address private _lobster;
@@ -82,7 +83,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   uint private _mintBlock;
 
-  string[] private _TRAITS = ["SAND", "WATER", "WAVES", "SPARKLING", "LOCATION", "FRAME", "FEATURE", "SIGN"];
+  string[] private _TRAITS;
   string[] private _DICT;
 
   mapping(uint256 => string) private _beachNames;
@@ -100,16 +101,20 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   uint256 private _totalSplit;
   uint256 private _amountReleased;
 
-  event PayeeAdded(address account, uint8 shares);
-  event PayeeUpdated(address account, uint8 shares);
-  event PaymentReleased(address account, uint256 amount);
+  event PayeeAdded(address indexed account, uint8 shares);
+  event PayeeUpdated(address indexed account, uint8 shares);
+  event PaymentReleased(address indexed account, uint256 amount);
   event Revealed();
-  event NameChanged(string name);
+  event NameChanged(uint256 tokenId, string name);
 
-  constructor(address lobster_, uint blocksBeforeTheMint_, bytes32 waveListRoot_) ERC721("B34CH DAO", "B34CH") {
+  constructor(address lobster_, uint blocksBeforeTheMint_, string[] memory traits_) ERC721("B34CH DAO", "B34CH") {
     _lobster = lobster_;
     _setDefaultRoyalty(address(this), 1000);
     _mintBlock = block.number + blocksBeforeTheMint_;
+    _TRAITS = traits_;
+  }
+
+  function setMerkleRoot(bytes32 waveListRoot_) external onlyOwner {
     waveListMerkleRoot = waveListRoot_;
   }
 
@@ -170,7 +175,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   override
   returns (string memory)
   {
-    require(tokenId_ >= 0 && tokenId_ < MAX_SUPPLY, "B: TokenID does not exist");
+    _exists(tokenId_);
     bytes memory smallImagePath = _revealed ? abi.encodePacked('"image": "', _baseURIPath, getRevealedPath(tokenId_), '/', BeachLibrary.toString(tokenId_), '.png",') : abi.encodePacked('"image": "', _baseURIPath, _placeholderURI, '",');
     bytes memory bigImagePath = _revealed ? abi.encodePacked('"image": "', _baseURIPath, getRevealedPath(tokenId_), '/', BeachLibrary.toString(tokenId_), '_large.png",') : abi.encodePacked('"image": "', _baseURIPath, _placeholderURI, '",');
     string memory attributes = _revealed ? BeachLibrary.hashToMetadata(tokenId_, _TRAITS, _DICT, _beachMetadata) : '[]';
@@ -183,52 +188,60 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     _;
   }
 
-  function gimmeBeaches(uint8 count_, bool isWaveList_, bytes32[] calldata merkleProof_) external payable {
+  function isMintLive() public view returns (bool) {
+    return block.number > _mintBlock;
+  }
+
+  function gimmeBeaches(uint8 count_, bytes32[] calldata merkleProof_) external payable {
     require(block.number > _mintBlock, "B: Mint block not ready");
-    require(count_ > 0 && count_ <= 5, "B: MAX 5 beaches at once");
-    require(balanceOf(_msgSender()) + count_ < 10, "B: Too many beaches");
+    require(count_ > 0 && count_ <= MAX_PER_TX, "B: Too many beaches for this tx");
+    require(balanceOf(_msgSender()) + count_ <= MAX_PER_WALLET, "B: Too many beaches");
+    require(msg.sender == tx.origin, "B: No contracts");
 
-    if (isWaveList_) {
-      require(MerkleProof.verify(merkleProof_, waveListMerkleRoot, keccak256(abi.encodePacked(_msgSender()))), "B: Not found in waveList");
-    }
-
-    require(msg.value == getMyPriceForNextMint(isWaveList_) * count_, "B: Minting amount incorrect");
+    uint mintPrice = getMyPriceForNextMint(merkleProof_);
+    require(msg.value == mintPrice * count_, "B: Minting amount incorrect");
 
     for (uint8 i = 0; i < count_; i++) {
       _mintABeach(_msgSender());
     }
   }
 
-  function safeMint(address to) public onlyOwner {
-    require(_tokenIdCounter < MAX_SUPPLY, "B: max supply reached");
-    _safeMint(to, _tokenIdCounter);
-    _setName(_tokenIdCounter, BeachLibrary.toString(_tokenIdCounter));
-  unchecked {
-    _tokenIdCounter += 1;
-  }
+  function amIWaveListed(bytes32[] calldata merkleProof_) public view returns (bool) {
+    uint lobsterBalance = resolveLobster(_msgSender());
+    bool isWaveList = false;
+
+    if (merkleProof_.length > 0) {
+      isWaveList = MerkleProof.verify(merkleProof_, waveListMerkleRoot, keccak256(abi.encodePacked(_msgSender())));
+    }
+
+    return lobsterBalance >= 1 || isWaveList;
   }
 
-  function _mintABeach(address to) private {
-    require(_tokenIdCounter < MAX_SUPPLY, "B: max supply reached");
-    _safeMint(to, _tokenIdCounter);
-    _setName(_tokenIdCounter, BeachLibrary.toString(_tokenIdCounter));
-  unchecked {
-    _tokenIdCounter += 1;
+  function safeMint(address to) public onlyOwner {
+    _mintABeach(to);
   }
+
+  function _mintABeach(address to) internal {
+    require(totalSupply() < MAX_SUPPLY, "B: max supply reached");
+    _safeMint(to, totalSupply());
   }
 
   /**
    * Name management
    */
-  function setName(uint tokenId_, string memory name_) public {
+  function setName(uint tokenId_, string memory name_) external {
     address owner = IERC721(address(this)).ownerOf(tokenId_);
     require(owner == _msgSender(), "B: You do not own this token");
     require(BeachLibrary.validateName(name_), "B: Name is not valid");
     require(nameExists(name_) == false, "B: Name requested is already used");
-    require(resolveSeafoodBalance(_msgSender()) > AMOUNT_NEEDED_FOR_NAME_CHANGE, "B: You do not have enough balance");
 
-    // Burn $BEACH
-    _burnSeafoodToken(AMOUNT_NEEDED_FOR_NAME_CHANGE);
+    // The setName process is free until seafood exists
+    if (_seafood != address(0x0)) {
+      require(resolveSeafoodBalance(_msgSender()) > AMOUNT_NEEDED_FOR_NAME_CHANGE, "B: You do not have enough balance");
+      // Burn $BEACH
+      _burnSeafoodToken(AMOUNT_NEEDED_FOR_NAME_CHANGE);
+    }
+
     _setName(tokenId_, name_);
   }
 
@@ -238,7 +251,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     }
     _beachNames[tokenId_] = name_;
     _existingNames[BeachLibrary.toLower(name_)] = true;
-    emit NameChanged(name_);
+    emit NameChanged(tokenId_, name_);
   }
 
   function nameExists(string memory name_) public view returns (bool) {
@@ -329,41 +342,41 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     emit Revealed();
   }
 
-  function currentTokenId() public view returns (uint) {
-    return _tokenIdCounter;
-  }
-
   function resolveLobster(address target) public view returns (uint) {
     return IERC721(_lobster).balanceOf(target);
   }
 
-  function getMyPriceForNextMint(bool isWaveList_) public view returns (uint) {
-    uint lobsterBalance = resolveLobster(_msgSender());
-    bool getWaveListPrice = lobsterBalance >= 1 || isWaveList_;
+  function getMintPrice(bool isWaveList_) public view returns (uint) {
+    uint currentSupply = totalSupply();
 
-    if (_tokenIdCounter < 137) {
-      if (getWaveListPrice) {
+    if (currentSupply < 137) {
+      if (isWaveList_) {
         return 0 ether;
       }
       return 1 ether;
-    } else if (_tokenIdCounter >= 137 && _tokenIdCounter < 317) {
-      if (getWaveListPrice) {
+    } else if (currentSupply >= 137 && currentSupply < 317) {
+      if (isWaveList_) {
         return 0.037 ether;
       }
       return 0.073 ether;
-    } else if (_tokenIdCounter >= 317 && _tokenIdCounter < 713) {
-      if (getWaveListPrice) {
+    } else if (currentSupply >= 317 && currentSupply < 713) {
+      if (isWaveList_) {
         return 0.073 ether;
       }
       return 0.1 ether;
-    } else if (_tokenIdCounter >= 713) {
-      if (getWaveListPrice) {
+    } else if (currentSupply >= 713) {
+      if (isWaveList_) {
         return 0.1 ether;
       }
       return 0.1337 ether;
     } else {
       return 1 ether;
     }
+  }
+
+  function getMyPriceForNextMint(bytes32[] calldata merkleProof_) public view returns (uint) {
+    bool isWaveList = amIWaveListed(merkleProof_);
+    return getMintPrice(isWaveList);
   }
 
   /**************************
@@ -447,6 +460,12 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
   function split() external onlyAccountOrOwner(_msgSender()) {
     _splitOutstandingBalance();
+  }
+
+  // dev: This is not supposed to be used. More like an emergency withdraw
+  //      It assumes that owner() is the DAO address.
+  function withdrawEthFunds() external onlyOwner {
+    Address.sendValue(payable(owner()), address(this).balance);
   }
 
   function release(address payable account) external onlyAccountOrOwner(account) {
