@@ -8,3 +8,6 @@ metadata
 #Hardhat files
 cache
 artifacts
+
+# Exclude some sub-folders
+website*/
