@@ -313,7 +313,7 @@ describe("Beach NFT", function () {
     this.timeout(300000);
 
     await mintMany(137, await multiSigOwner.getAddress(), beachNFT137);
-    await mintMany(317, await multiSigOwner.getAddress(), beachNFT317);
+    // await mintMany(317, await multiSigOwner.getAddress(), beachNFT317);
     // await mintMany(713, await multiSigOwner.getAddress(), beachNFT713);
 
     await beachNFT137.transferOwnership(await multiSigOwner.getAddress());
@@ -360,6 +360,7 @@ describe("Beach NFT", function () {
         expect(await beachNFT.MAX_SUPPLY()).to.equal(MAX_SUPPLY);
       });
 
+      // Slow test
       xit("Should not allow minting more than 1337 NFTs", async function () {
         // Deploy a new contract to max supply
         const beachSupplyNFT = await BeachNFT.deploy(
@@ -587,7 +588,7 @@ describe("Beach NFT", function () {
   });
 
   describe("DAO Functions", async function () {
-    it("Show allow withdraw all ETH funds from the smart contract", async function () {
+    it("Should allow withdraw all ETH funds from the smart contract", async function () {
       await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
       await beachNFT.connect(multiSigOwner).withdrawEthFunds();
       expect(
@@ -596,7 +597,20 @@ describe("Beach NFT", function () {
       ).to.equal(0);
     });
 
-    // TODO: Test ERC20 withdrawals
+    it("Should allow withdrawing ERC20", async function () {
+      await dollarBeach
+        .connect(multiSigOwner)
+        .spend(beachNFT.address, toWei(1));
+      let balance = await dollarBeach.balanceOf(beachNFT.address);
+      expect(balance, "Balance should be greater than 0").to.be.gt(0);
+      await beachNFT
+        .connect(multiSigOwner)
+        .withdrawERC20Funds(dollarBeach.address);
+      balance = await dollarBeach.balanceOf(beachNFT.address);
+      expect(balance, "Balance should be 0").to.equal(0);
+      balance = await dollarBeach.balanceOf(await multiSigOwner.getAddress());
+      expect(balance, "Balance should be greater than 0").to.be.gt(0);
+    });
   });
 
   describe("Royalties at mint time", async function () {
@@ -1058,7 +1072,7 @@ describe("Beach NFT", function () {
     // });
   });
 
-  describe("Pricing", async function () {
+  xdescribe("Pricing", async function () {
     describe("Lobster owners", async function () {
       it("Should return free (0) if I have Lobsters and the current wave is the first wave", async function () {
         expect(
@@ -1066,19 +1080,19 @@ describe("Beach NFT", function () {
         ).to.equal(ethers.utils.parseEther("0"));
       });
 
-      xit("Should return 0.037 ether if I have 1 Lobsters or more and the current wave is the second wave", async function () {
+      it("Should return 0.037 ether if I have 1 Lobsters or more and the current wave is the second wave", async function () {
         expect(
           await beachNFT137.connect(address2).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.037"));
       });
 
-      xit("Should return 0.073 ether if I have Lobsters and the current wave is the third wave", async function () {
+      it("Should return 0.073 ether if I have Lobsters and the current wave is the third wave", async function () {
         expect(
           await beachNFT317.connect(address1).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.073"));
       });
 
-      xit("Should return 0.1 ether if I have Lobsters and the current wave is the fourth wave", async function () {
+      it("Should return 0.1 ether if I have Lobsters and the current wave is the fourth wave", async function () {
         expect(
           await beachNFT713.connect(address1).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.1"));
@@ -1092,19 +1106,19 @@ describe("Beach NFT", function () {
         ).to.equal(ethers.utils.parseEther("1"));
       });
 
-      xit("Should return 0.037 ether if I have Lobsters and the current wave is the second wave", async function () {
+      it("Should return 0.037 ether if I have Lobsters and the current wave is the second wave", async function () {
         expect(
           await beachNFT137.connect(address3).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.073"));
       });
 
-      xit("Should return 0.073 ether if I have Lobsters and the current wave is the third wave", async function () {
+      it("Should return 0.073 ether if I have Lobsters and the current wave is the third wave", async function () {
         expect(
           await beachNFT317.connect(address3).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.1"));
       });
 
-      xit("Should return 0.1 ether if I have Lobsters and the current wave is the fourth wave", async function () {
+      it("Should return 0.1 ether if I have Lobsters and the current wave is the fourth wave", async function () {
         expect(
           await beachNFT713.connect(address3).getMyPriceForNextMint([])
         ).to.equal(ethers.utils.parseEther("0.1337"));

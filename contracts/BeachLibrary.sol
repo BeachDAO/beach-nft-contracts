@@ -195,6 +195,18 @@ library BeachLibrary {
     return string(abi.encodePacked("[", metadataString, "]"));
   }
 
+  function getImagePath(uint tokenId_, bool revealed_, string memory baseURIPath_, string memory revealedPath_, string memory placeHolderURI_, bool small_) public view returns (bytes memory) {
+    return revealed_ ?
+    abi.encodePacked('"image": "', baseURIPath_, revealedPath_, '/', toString(tokenId_), small_ ? '.png",' : '_large.png",') :
+    abi.encodePacked('"image": "', baseURIPath_, placeHolderURI_, '",');
+  }
+
+  function getSmallImagePath(uint tokenId_, bool revealed_, string memory baseURIPath_, string memory revealedPath_, string memory placeHolderURI_) public view returns (bytes memory) {
+    return revealed_ ?
+    abi.encodePacked('"image": "', baseURIPath_, revealedPath_, '/', toString(tokenId_), '.png",') :
+    abi.encodePacked('"image": "', baseURIPath_, placeHolderURI_, '",');
+  }
+
   function buildTokenURI(
     uint tokenId_,
     string memory beachName_,

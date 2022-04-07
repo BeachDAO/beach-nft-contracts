@@ -176,11 +176,13 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   returns (string memory)
   {
     _exists(tokenId_);
-    bytes memory smallImagePath = _revealed ? abi.encodePacked('"image": "', _baseURIPath, getRevealedPath(tokenId_), '/', BeachLibrary.toString(tokenId_), '.png",') : abi.encodePacked('"image": "', _baseURIPath, _placeholderURI, '",');
-    bytes memory bigImagePath = _revealed ? abi.encodePacked('"image": "', _baseURIPath, getRevealedPath(tokenId_), '/', BeachLibrary.toString(tokenId_), '_large.png",') : abi.encodePacked('"image": "', _baseURIPath, _placeholderURI, '",');
-    string memory attributes = _revealed ? BeachLibrary.hashToMetadata(tokenId_, _TRAITS, _DICT, _beachMetadata) : '[]';
 
-    return BeachLibrary.buildTokenURI(tokenId_, beachName(tokenId_), smallImagePath, bigImagePath, attributes);
+    return BeachLibrary.buildTokenURI(
+      tokenId_,
+      beachName(tokenId_),
+      BeachLibrary.getImagePath(tokenId_, _revealed, _baseURIPath, getRevealedPath(tokenId_), _placeholderURI, true),
+      BeachLibrary.getImagePath(tokenId_, _revealed, _baseURIPath, getRevealedPath(tokenId_), _placeholderURI, false),
+      _revealed ? BeachLibrary.hashToMetadata(tokenId_, _TRAITS, _DICT, _beachMetadata) : '[]');
   }
 
   modifier revealedStatus(bool revealStatus_) {
@@ -384,11 +386,10 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    **************************/
 
   function _addPayee(address account_, uint8 shares_) private {
-    require(account_ != address(0), "PS: Address can't be 0");
-    require(shares_ > 0, "PS: Shares can't be 0");
-    require(_totalShares + shares_ < 256, "PS: Max shares reached");
-    require(_shares[account_] == 0, "PS: Account already has shares");
-    require(_released[account_] == 0 || _balances[account_] == 0, "PS: Released or balances is non-0 for this account");
+    require(account_ != address(0), "PS: No 0");
+    require(shares_ > 0, "PS: Shares = 0");
+    require(_totalShares + shares_ < 256, "PS: Max shares");
+    require(_shares[account_] == 0 && _released[account_] == 0 && _balances[account_] == 0, "PS: Account exists");
     require(_payees.length < 256, "PS: Too many shareholders");
 
     // Flush outstanding balances to ensure that new payees don't mess things up
@@ -396,8 +397,6 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
     _payees.push(account_);
     _shares[account_] = shares_;
-    _released[account_] = 0;
-    _balances[account_] = 0;
     _totalShares += shares_;
 
     emit PayeeAdded(account_, shares_);
@@ -468,8 +467,12 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     Address.sendValue(payable(owner()), address(this).balance);
   }
 
+  function withdrawERC20Funds(address ERC20_) external onlyOwner {
+    IERC20(ERC20_).transfer(owner(), IERC20(ERC20_).balanceOf(address(this)));
+  }
+
   function release(address payable account) external onlyAccountOrOwner(account) {
-    require(_balances[account] > 0, "PS: Account has no balance");
+    require(_balances[account] > 0, "PS: No balance");
 
     _splitOutstandingBalance();
 
@@ -499,7 +502,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   modifier onlyAccountOrOwner(address account) {
-    require(owner() == _msgSender() || account == _msgSender(), "Caller is not the owner nor the account owner");
+    require(owner() == _msgSender() || account == _msgSender(), "Not the owner or account owner");
     _;
   }
 }
