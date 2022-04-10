@@ -41,8 +41,14 @@ let royaltiesAccountsSigners: Signer[];
 const priceOverride0037 = {
   value: ethers.utils.parseEther("0.037"),
 };
+const priceOverride0073 = {
+  value: ethers.utils.parseEther("0.073"),
+};
 const priceOverride0037x3 = {
   value: ethers.utils.parseEther("0.111"),
+};
+const priceOverride0073x3 = {
+  value: ethers.utils.parseEther("0.219"),
 };
 const priceOverride0037x5 = {
   value: ethers.utils.parseEther("0.185"),
@@ -157,6 +163,7 @@ function toWei(amount: number) {
 const DOLLLAR_BEACH_DROP_RATE = BigNumber.from(152_788_388_082_506).mul(5);
 
 const MAX_SUPPLY = 1337;
+let _pew; // swallows stuff we don't need
 
 describe("Beach NFT", function () {
   this.timeout(300000);
@@ -313,8 +320,8 @@ describe("Beach NFT", function () {
     this.timeout(300000);
 
     await mintMany(137, await multiSigOwner.getAddress(), beachNFT137);
-    // await mintMany(317, await multiSigOwner.getAddress(), beachNFT317);
-    // await mintMany(713, await multiSigOwner.getAddress(), beachNFT713);
+    await mintMany(317, await multiSigOwner.getAddress(), beachNFT317);
+    await mintMany(713, await multiSigOwner.getAddress(), beachNFT713);
 
     await beachNFT137.transferOwnership(await multiSigOwner.getAddress());
     await beachNFT317.transferOwnership(await multiSigOwner.getAddress());
@@ -361,7 +368,7 @@ describe("Beach NFT", function () {
       });
 
       // Slow test
-      xit("Should not allow minting more than 1337 NFTs", async function () {
+      it("Should not allow minting more than 1337 NFTs", async function () {
         // Deploy a new contract to max supply
         const beachSupplyNFT = await BeachNFT.deploy(
           lobsterMock.address,
@@ -656,9 +663,10 @@ describe("Beach NFT", function () {
       for (let i = 0; i < royaltiesAccounts.length; i++) {
         const expectedBalance =
           (amountReceived * royaltiesSharesSplit[i]) / totalShares;
-        const actualBalance = await beachNFT
+        let actualBalance;
+        [_pew, _pew, actualBalance, _pew] = await beachNFT
           .connect(multiSigOwner)
-          .accountBalance(royaltiesAccounts[i]);
+          .accountDetails(royaltiesAccounts[i]);
 
         expect(actualBalance).to.equal(
           ethers.utils.parseEther(expectedBalance.toString())
@@ -679,9 +687,10 @@ describe("Beach NFT", function () {
       for (let i = 0; i < royaltiesAccounts.length; i++) {
         const expectedBalance =
           (amountReceived * royaltiesSharesSplit[i]) / totalShares;
-        const actualBalance = await beachNFT137
+        let actualBalance;
+        [_pew, _pew, actualBalance, _pew] = await beachNFT137
           .connect(royaltiesAccounts[i])
-          .accountBalance(royaltiesAccounts[i]);
+          .accountDetails(royaltiesAccounts[i]);
 
         expect(actualBalance).to.equal(
           ethers.utils.parseEther(expectedBalance.toString())
@@ -703,13 +712,13 @@ describe("Beach NFT", function () {
           .release(royaltiesAccounts[i]);
 
         const actualBalance = await royaltiesAccountsSigners[i].getBalance();
+        let accountBalance;
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
+          .connect(multiSigOwner)
+          .accountDetails(royaltiesAccounts[i]);
 
         expect(actualBalance.gt(ethers.utils.parseEther("0"))).to.be.ok;
-        expect(
-          await beachNFT137
-            .connect(multiSigOwner)
-            .accountBalance(royaltiesAccounts[i])
-        ).to.equal(ethers.utils.parseEther("0"));
+        expect(accountBalance).to.equal(ethers.utils.parseEther("0"));
       }
     });
 
@@ -731,51 +740,49 @@ describe("Beach NFT", function () {
 
       await beachNFT137.connect(multiSigOwner).split();
 
-      account0Balance = await beachNFT137
+      [_pew, _pew, account0Balance, _pew] = await beachNFT137
         .connect(royaltiesAccountsSigners[0])
-        .accountBalance(royaltiesAccounts[0]);
-      console.log("Account 0 balance #0: ", account0Balance);
+        .accountDetails(royaltiesAccounts[0]);
+      // console.log("Account 0 balance #0: ", account0Balance);
 
       await beachNFT137
-        .connect(address2)
-        .gimmeBeaches(5, [], priceOverride0037x5);
+        .connect(address3)
+        .gimmeBeaches(3, [], priceOverride0073x3);
 
       await beachNFT137.connect(multiSigOwner).split();
 
-      account0Balance = await beachNFT137
+      [_pew, _pew, account0Balance, _pew] = await beachNFT137
         .connect(royaltiesAccountsSigners[0])
-        .accountBalance(royaltiesAccounts[0]);
+        .accountDetails(royaltiesAccounts[0]);
       amountExpected = amountReceived(
-        0.037,
-        5,
+        0.073,
+        3,
         royaltiesSharesSplit[0]
       ).toString();
 
-      console.log(
-        "Account 0 balance #1: ",
-        account0Balance,
-        "Account 0 expected balance #1: ",
-        amountExpected
-      );
+      // console.log(
+      //   "Account 0 balance #1: ",
+      //   account0Balance,
+      //   "Account 0 expected balance #1: ",
+      //   amountExpected
+      // );
 
       expect(account0Balance).to.equal(
-        ethers.utils.parseEther(
-          amountReceived(0.037, 5, royaltiesSharesSplit[0]).toString()
-        ),
+        ethers.utils.parseEther(amountExpected),
         `Amount received should be ${amountExpected}`
       );
 
       // Checking if re-split works
       await beachNFT137.connect(multiSigOwner).split();
-      account0Balance = await beachNFT137
+      [_pew, _pew, account0Balance, _pew] = await beachNFT137
         .connect(royaltiesAccountsSigners[0])
-        .accountBalance(royaltiesAccounts[0]);
-      console.log(
-        "Account 0 balance #1.2 (re-split): ",
-        account0Balance,
-        "Account 0 expected balance #1.2 (re-split): ",
-        amountExpected
-      );
+        .accountDetails(royaltiesAccounts[0]);
+      // console.log(
+      //   "Account 0 balance #1.2 (re-split): ",
+      //   account0Balance,
+      //   "Account 0 expected balance #1.2 (re-split): ",
+      //   amountExpected
+      // );
 
       expect(account0Balance).to.equal(
         ethers.utils.parseEther(amountExpected),
@@ -790,33 +797,33 @@ describe("Beach NFT", function () {
       ).to.be.ok;
 
       amountExpected = ethers.utils.parseEther("0");
-      account0Balance = await beachNFT137
+      [_pew, _pew, account0Balance, _pew] = await beachNFT137
         .connect(royaltiesAccountsSigners[0])
-        .accountBalance(royaltiesAccounts[0]);
-      console.log("Account 0 balance #2.1 (release funds): ", account0Balance);
-      console.log(
-        "Account 0 expected balance #2.1 (release funds): ",
-        amountExpected
-      );
+        .accountDetails(royaltiesAccounts[0]);
+      // console.log("Account 0 balance #2.1 (release funds): ", account0Balance);
+      // console.log(
+      //   "Account 0 expected balance #2.1 (release funds): ",
+      //   amountExpected
+      // );
       expect(account0Balance, "Funds should be 0 after release").to.equal(
         amountExpected
       );
 
       await beachNFT137
-        .connect(address1)
-        .gimmeBeaches(3, [], priceOverride0037x3);
+        .connect(address3)
+        .gimmeBeaches(1, [], priceOverride0073);
 
       await beachNFT137.connect(multiSigOwner).split();
 
       amountExpected = ethers.utils.parseEther(
-        amountReceived(0.037, 3, royaltiesSharesSplit[0]).toString()
+        amountReceived(0.073, 1, royaltiesSharesSplit[0]).toString()
       );
 
-      account0Balance = await beachNFT137
+      [_pew, _pew, account0Balance, _pew] = await beachNFT137
         .connect(royaltiesAccountsSigners[0])
-        .accountBalance(royaltiesAccounts[0]);
-      console.log("Account 0 balance #3: ", account0Balance);
-      console.log("Account 0 expected balance #3: ", amountExpected);
+        .accountDetails(royaltiesAccounts[0]);
+      // console.log("Account 0 balance #3: ", account0Balance);
+      // console.log("Account 0 expected balance #3: ", amountExpected);
       expect(account0Balance, "Received price for 3 mint").to.equal(
         amountExpected
       );
@@ -828,14 +835,17 @@ describe("Beach NFT", function () {
       await beachNFT137.connect(multiSigOwner).split();
 
       amountExpected = ethers.utils.parseEther(
-        amountReceived(0.037, 3 * 2, royaltiesSharesSplit[0]).toString()
+        (
+          amountReceived(0.037, 3, royaltiesSharesSplit[0]) +
+          amountReceived(0.073, 1, royaltiesSharesSplit[0])
+        ).toString()
       );
 
-      account0Balance = await beachNFT137
+      [_pew, _pew, account0Balance, _pew] = await beachNFT137
         .connect(royaltiesAccountsSigners[0])
-        .accountBalance(royaltiesAccounts[0]);
-      console.log("Account 0 balance #4: ", account0Balance);
-      console.log("Account 0 expected balance #4: ", amountExpected);
+        .accountDetails(royaltiesAccounts[0]);
+      // console.log("Account 0 balance #4: ", account0Balance);
+      // console.log("Account 0 expected balance #4: ", amountExpected);
       expect(account0Balance, "Received price for 3 mints").to.equal(
         amountExpected
       );
@@ -848,14 +858,14 @@ describe("Beach NFT", function () {
       ).to.be.ok;
 
       amountExpected = ethers.utils.parseEther("0");
-      account0Balance = await beachNFT137
+      [_pew, _pew, account0Balance, _pew] = await beachNFT137
         .connect(royaltiesAccountsSigners[0])
-        .accountBalance(royaltiesAccounts[0]);
-      console.log("Account 0 balance #4.1 (release): ", account0Balance);
-      console.log(
-        "Account 0 expected balance #4.1 (release): ",
-        amountExpected
-      );
+        .accountDetails(royaltiesAccounts[0]);
+      // console.log("Account 0 balance #4.1 (release): ", account0Balance);
+      // console.log(
+      //   "Account 0 expected balance #4.1 (release): ",
+      //   amountExpected
+      // );
       expect(account0Balance, "Funds should be 0 after release").to.equal(
         amountExpected
       );
@@ -872,9 +882,9 @@ describe("Beach NFT", function () {
         await beachNFT137.connect(multiSigOwner).addPayee(multiSigAddress, 25);
 
         amountExpected = ethers.utils.parseEther("0");
-        accountBalance = await beachNFT137
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
           .connect(multiSigOwner)
-          .accountBalance(multiSigAddress);
+          .accountDetails(multiSigAddress);
 
         expect(
           accountBalance,
@@ -893,9 +903,9 @@ describe("Beach NFT", function () {
           25,
           totalShares + 25
         ).toString();
-        accountBalance = await beachNFT137
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
           .connect(multiSigOwner)
-          .accountBalance(multiSigAddress);
+          .accountDetails(multiSigAddress);
 
         expect(
           accountBalance,
@@ -905,10 +915,10 @@ describe("Beach NFT", function () {
         amountExpected = (
           amountReceived(0.037, 1, 50, totalShares) +
           amountReceived(0.037, 1, 50, totalShares + 25)
-        ).toString();
-        accountBalance = await beachNFT137
+        ).toFixed(5);
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
           .connect(multiSigOwner)
-          .accountBalance(royaltiesAccounts[0]);
+          .accountDetails(royaltiesAccounts[0]);
 
         expect(
           accountBalance,
@@ -921,48 +931,103 @@ describe("Beach NFT", function () {
         const multiSigAddress = await multiSigOwner.getAddress();
 
         await beachNFT137
-          .connect(address2)
-          .gimmeBeaches(1, [], priceOverride0037);
-        await beachNFT137.connect(multiSigOwner).addPayee(multiSigAddress, 25);
+          .connect(addressSupply)
+          .gimmeBeaches(1, [], priceOverride0073);
 
-        amountExpected = ethers.utils.parseEther("0");
-        accountBalance = await beachNFT137
+        let thisAccountShares, thisAccountReleased, thisAccountBalance;
+
+        [thisAccountShares, thisAccountReleased, thisAccountBalance, _pew] =
+          await beachNFT137
+            .connect(multiSigOwner)
+            .accountDetails(multiSigAddress);
+
+        if (
+          thisAccountShares === 0 &&
+          thisAccountReleased.eq(0) &&
+          thisAccountBalance.eq(0)
+        ) {
+          await beachNFT137
+            .connect(multiSigOwner)
+            .addPayee(multiSigAddress, 25);
+
+          amountExpected = ethers.utils.parseEther("0");
+
+          [_pew, _pew, accountBalance, _pew] = await beachNFT137
+            .connect(multiSigOwner)
+            .accountDetails(multiSigAddress);
+
+          expect(
+            accountBalance,
+            "Should be 0 since it was added after a payout"
+          ).to.equal(amountExpected);
+        }
+
+        // Release all funds to reset everything
+        await beachNFT137.connect(multiSigOwner).split();
+
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
           .connect(multiSigOwner)
-          .accountBalance(multiSigAddress);
+          .accountDetails(royaltiesAccounts[0]);
 
-        expect(
-          accountBalance,
-          "Should be 0 since it was added after a payout"
-        ).to.equal(amountExpected);
+        if (accountBalance > 0) {
+          await beachNFT137
+            .connect(multiSigOwner)
+            .release(royaltiesAccounts[0]);
+        }
+
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
+          .connect(multiSigOwner)
+          .accountDetails(royaltiesAccounts[1]);
+
+        if (accountBalance > 0) {
+          await beachNFT137
+            .connect(multiSigOwner)
+            .release(royaltiesAccounts[1]);
+        }
+
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
+          .connect(multiSigOwner)
+          .accountDetails(royaltiesAccounts[2]);
+
+        if (accountBalance > 0) {
+          await beachNFT137
+            .connect(multiSigOwner)
+            .release(royaltiesAccounts[2]);
+        }
+
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
+          .connect(multiSigOwner)
+          .accountDetails(multiSigAddress);
+
+        if (accountBalance > 0) {
+          await beachNFT137.connect(multiSigOwner).release(multiSigAddress);
+        }
 
         await beachNFT137
-          .connect(address2)
-          .gimmeBeaches(1, [], priceOverride0037);
+          .connect(addressSupply)
+          .gimmeBeaches(1, [], priceOverride0073);
 
         await beachNFT137.connect(multiSigOwner).split();
 
-        amountExpected = amountReceived(
-          0.037,
-          1,
-          25,
-          totalShares + 25
-        ).toString();
-        accountBalance = await beachNFT137
+        amountExpected = amountReceived(0.073, 1, 25, totalShares + 25).toFixed(
+          5
+        );
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
           .connect(multiSigOwner)
-          .accountBalance(multiSigAddress);
+          .accountDetails(multiSigAddress);
 
         expect(
           accountBalance,
           "New addee's balance should be correctly reflected"
         ).to.equal(ethers.utils.parseEther(amountExpected));
 
-        amountExpected = (
-          amountReceived(0.037, 1, 50, totalShares) +
-          amountReceived(0.037, 1, 50, totalShares + 25)
-        ).toString();
-        accountBalance = await beachNFT137
+        amountExpected = amountReceived(0.073, 1, 50, totalShares + 25).toFixed(
+          // amountReceived(0.037, 1, 50, totalShares) +
+          5
+        );
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
           .connect(multiSigOwner)
-          .accountBalance(royaltiesAccounts[0]);
+          .accountDetails(royaltiesAccounts[0]);
 
         expect(
           accountBalance,
@@ -976,8 +1041,8 @@ describe("Beach NFT", function () {
           .connect(multiSigOwner)
           .updatePayee(multiSigAddress, 50);
         await beachNFT137
-          .connect(address1)
-          .gimmeBeaches(1, [], priceOverride0037);
+          .connect(addressSupply)
+          .gimmeBeaches(1, [], priceOverride0073);
         await beachNFT137
           .connect(multiSigOwner)
           .updatePayee(royaltiesAccounts[0], 25);
@@ -988,22 +1053,24 @@ describe("Beach NFT", function () {
         await beachNFT137.connect(multiSigOwner).split();
 
         amountExpected = (
+          amountReceived(0.073, 1, 25, totalShares + 25) +
           amountReceived(0.037, 1, 25, totalShares + 25) +
-          amountReceived(0.037, 1, 25, totalShares + 25) +
-          amountReceived(0.037, 1, 50, totalShares + 50) +
+          amountReceived(0.073, 1, 50, totalShares + 50) +
           amountReceived(0.037, 1, 50, totalShares + 50 - 25)
-        ).toString();
-        accountBalance = await beachNFT137
+        ).toFixed(5);
+        [_pew, _pew, accountBalance, _pew] = await beachNFT137
           .connect(multiSigOwner)
-          .accountBalance(multiSigAddress);
+          .accountDetails(multiSigAddress);
 
         expect(
-          accountBalance,
+          accountBalance.div(BigNumber.from(10e12)).mul(BigNumber.from(10e12)),
           "Balance of an account after multiple modifications should reflect correctly"
         ).to.equal(ethers.utils.parseEther(amountExpected));
       });
 
       it("Should withdraw all funds from the Smart Contract balance if all shareholders release", async function () {
+        let balanceAvailable;
+
         await beachNFT137
           .connect(address3)
           .gimmeBeaches(
@@ -1015,7 +1082,10 @@ describe("Beach NFT", function () {
         await beachNFT137.connect(multiSigOwner).release(royaltiesAccounts[0]);
         await beachNFT137.connect(multiSigOwner).release(royaltiesAccounts[1]);
         await beachNFT137.connect(multiSigOwner).release(royaltiesAccounts[2]);
-        const balanceAvailable = await beachNFT137
+        await beachNFT137
+          .connect(multiSigOwner)
+          .release(await multiSigOwner.getAddress());
+        balanceAvailable = await beachNFT137
           .connect(multiSigOwner)
           .balanceAvailable();
         expect(balanceAvailable).to.equal(ethers.utils.parseEther("0"));
@@ -1072,7 +1142,7 @@ describe("Beach NFT", function () {
     // });
   });
 
-  xdescribe("Pricing", async function () {
+  describe("Pricing", async function () {
     describe("Lobster owners", async function () {
       it("Should return free (0) if I have Lobsters and the current wave is the first wave", async function () {
         expect(

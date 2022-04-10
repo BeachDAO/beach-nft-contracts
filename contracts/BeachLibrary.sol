@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/interfaces/IERC721Enumerable.sol";
+
 // From https://etherscan.io/address/0xbad6186e92002e312078b5a1dafd5ddf63d3f731#code
 library BeachLibrary {
   string internal constant TABLE =
@@ -264,5 +266,19 @@ library BeachLibrary {
         )
       )
     );
+  }
+
+  function walletOfOwner(address wallet_, address creed_)
+  public
+  view
+  returns (uint256[] memory)
+  {
+    uint256 tokenCount = IERC721Enumerable(creed_).balanceOf(wallet_);
+
+    uint256[] memory tokensId = new uint256[](tokenCount);
+    for (uint256 i; i < tokenCount; i++) {
+      tokensId[i] = IERC721Enumerable(creed_).tokenOfOwnerByIndex(wallet_, i);
+    }
+    return tokensId;
   }
 }
