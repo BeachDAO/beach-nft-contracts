@@ -43,7 +43,7 @@ KKKKKKKK00KKK0KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK0KKKKK00K00000000KK0KKKKKKKKKKK
 KKKKKKKKKKKKKKK00KKKKKKKKKKKK0KKKKKKKKK0KKKKKKKKKKK0KKK00KKKKK00KKKKKK00KKKKKKKKKKKKKKKKKKKK00KKKKKKKKKK00KKKKKKKKKKKKKKKKKKK0KKl'oKK00
 */
 
-pragma solidity ^0.8.2;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -147,15 +147,24 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     _baseURIPath = uri_;
   }
 
+  /**
+   * @dev Allows the owner to freeze the path so it can't be changed anymore once it has settled
+   */
   function freezeBasePath() external onlyOwner pathNotFrozen {
     _freezeBasePath = true;
   }
 
-  // Folder is too big so it was split into 2 assets
+  /**
+   * @dev Gets the path after reveal. The image folder is too big so it had to be split in 2 folders at ID 1000
+   * @param tokenId_ TokenId to retrieve the path for
+   */
   function getRevealedPath(uint256 tokenId_) internal view returns (string memory) {
     return tokenId_ < 1000 ? _revealedPath[0] : _revealedPath[1];
   }
 
+  /**
+   * @dev Builds the contract JSON from on-chain data to serve marketplaces
+   */
   function contractURI() public view returns (string memory) {
     return BeachLibrary.buildContractURI(address(this));
   }
@@ -180,20 +189,35 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
       _revealed ? BeachLibrary.hashToMetadata(tokenId_, _TRAITS, _DICT, _beachMetadata) : '[]');
   }
 
+  /**
+   * @dev Returns whether a reveal status matches the boolean passed.
+   * @param revealStatus_ The status to check for
+   */
   modifier revealedStatus(bool revealStatus_) {
     require(_revealed == revealStatus_);
     _;
   }
 
+  /**
+   * @dev Function mostly for UI / UX so anyone can know whether the mint is opened and block has been reached
+   */
   function isMintLive() public view returns (bool) {
     return block.number > _mintBlock;
   }
 
+  /**
+   * @dev Mints one or more B34CH NFT up to the MAX per TX and MAX per Wallet.
+   *      NOTE: During first phase of the mint (the first 137 NFTs), the MAX is over-ridden to 1.
+   *      If you have been WaveListed, the right pricing will apply automatically.
+   *      Call getMyPriceForNextMint() in order to know exactly how much you need to send.
+   * @param count_ The amount of NFTs to mint at once
+   * @param merkleProof_ The array of proofs needed to calculate your wallet all the way to the root to validate it
+   */
   function gimmeBeaches(uint8 count_, bytes32[] calldata merkleProof_) external payable {
     require(block.number > _mintBlock, "B: Mint block not ready");
-    require(count_ > 0 && count_ <= MAX_PER_TX, "B: Too many beaches for this tx");
-    require(balanceOf(_msgSender()) + count_ <= MAX_PER_WALLET, "B: Too many beaches");
+    require((count_ > 0 && count_ <= MAX_PER_TX) && (balanceOf(_msgSender()) + count_ <= MAX_PER_WALLET), "B: Too many beaches");
     require(_msgSender() == tx.origin, "B: No contracts");
+    require((totalSupply() < 137 && balanceOf(_msgSender()) == 0 && count_ == 1) || totalSupply() >= 137, "B: Only 1 in 1st wave");
 
     uint mintPrice = getMyPriceForNextMint(merkleProof_);
     require(msg.value == mintPrice * count_, "B: Minting amount incorrect");
@@ -203,27 +227,45 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     }
   }
 
+  /**
+   * @dev Function to validate of your wallet address is present within the merkle tree or if your balance of LobsterDAO
+   *      NFT is positive.
+   * @param merkleProof_ The array of proofs needed to calculate your wallet all the way to the root to validate it
+   */
   function amIWaveListed(bytes32[] calldata merkleProof_) public view returns (bool) {
     bool isWaveList = merkleProof_.length > 0 ? MerkleProof.verify(merkleProof_, waveListMerkleRoot, keccak256(abi.encodePacked(_msgSender()))) : false;
     return resolveLobster(_msgSender()) >= 1 || isWaveList;
   }
 
-  function safeMint(address to) public onlyOwner {
-    _mintABeach(to);
-  }
-
-  function _mintABeach(address to) internal {
-    require(totalSupply() < MAX_SUPPLY, "B: max supply reached");
-    _safeMint(to, totalSupply());
+  /**
+   * @dev Function to enable the owner to rescue mints or giveaways if required. Not intended to be used.
+   * @param to_ the address to mint to
+   */
+  function safeMint(address to_) public onlyOwner {
+    _mintABeach(to_);
   }
 
   /**
-   * Name management
+   * @dev Internal function to enable the owner to rescue mints or giveaways if required. Not intended to be used.
+   * @param to_ the address to mint to
+   */
+  function _mintABeach(address to_) internal {
+    require(totalSupply() < MAX_SUPPLY, "B: max supply reached");
+    _safeMint(to_, totalSupply());
+  }
+
+  /**
+   * @dev Method to set the name of the NFT and update metadata accordingly so it's visible on OpenSea / on-chain.
+   *      The method will make sure you are renaming tokens you own.
+   *      The name needs to be unique, do not contain invalid characters (mostly just ASCII are allowed) and be short
+   *      enough.
+   * @param tokenId_ the token to rename
+   * @param name_ the new name
    */
   function setName(uint tokenId_, string memory name_) external {
     require(ownerOf(tokenId_) == _msgSender(), "B: You do not own this token");
     require(BeachLibrary.validateName(name_), "B: Name is not valid");
-    require(nameExists(name_) == false, "B: Name requested is already used");
+    require(!nameExists(name_), "B: Name requested is already used");
 
     // The setName process is free until seafood exists
     if (_seafood != address(0x0)) {
@@ -235,6 +277,11 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     _setName(tokenId_, name_);
   }
 
+  /**
+   * @dev Internal method to propagate the name change, focused on name changing (minus validations)
+   * @param tokenId_ the token to rename
+   * @param name_ the new name
+   */
   function _setName(uint tokenId_, string memory name_) private {
     if (bytes(_beachNames[tokenId_]).length > 0) {
       _existingNames[_beachNames[tokenId_]] = false;
@@ -244,27 +291,44 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     emit NameChanged(tokenId_, name_);
   }
 
+  /**
+   * @dev Public method to find whether a name is unique or exists already
+   * @param name_ the name top search for
+   */
   function nameExists(string memory name_) public view returns (bool) {
     return _existingNames[BeachLibrary.toLower(name_)];
   }
 
+  /**
+   * @dev Helper function to return the name of a beach. It will default the name if the name has never been set,
+   *      to save gas during mint.
+   * @param tokenId_ The token ID to return the name of
+   */
   function beachName(uint tokenId_) public view returns (string memory) {
     bool isEmpty = keccak256(abi.encodePacked(_beachNames[tokenId_])) == keccak256(abi.encodePacked("")) || keccak256(abi.encodePacked(_beachNames[tokenId_])) == keccak256(bytes(BeachLibrary.toString(tokenId_)));
     return string(abi.encodePacked("Beach ", isEmpty ? string(abi.encodePacked("#", BeachLibrary.toString(tokenId_))) : _beachNames[tokenId_]));
   }
 
   /**
-   * $SEAFOOD management
+   * @dev Internal helper function to return the balance of the $Seafood token
+   * @param account_ The account to retrieve the balance of
    */
-  function resolveSeafoodBalance(address account) internal view returns (uint) {
-    return IERC20(_seafood).balanceOf(account);
+  function resolveSeafoodBalance(address account_) internal view returns (uint) {
+    return IERC20(_seafood).balanceOf(account_);
   }
 
-  // Takes a high order amount (for example 10) and returns fully decimal'ed value (10 * 10 ** 18)
+  /**
+   * @dev Takes a high order amount (for example 10) and returns fully decimal'ed value (10 * 10 ** 18)
+   * @param amount_ The amount to calculate for
+   */
   function _toFullDecimals(uint amount_) private view returns (uint) {
     return amount_ * 10 ** ISeafood(_seafood).decimals();
   }
 
+  /**
+   * @dev Internal helper to burn seafood token to change name, if $seafood address has been set
+   * @param amount_ The amount to burn, in high order (you want to burn 10 $SEAFOOD, amount_ will be 10)
+   */
   function _burnSeafoodToken(uint amount_) private returns (bool) {
     require(resolveSeafoodBalance(_msgSender()) >= _toFullDecimals(amount_), "B: Not enough balance");
     IERC20Burnable(_seafood).burnFrom(_msgSender(), _toFullDecimals(amount_));
@@ -272,7 +336,6 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   }
 
   // The following functions are overrides required by Solidity.
-
   function _burn(uint256 tokenId) internal override(ERC721, ERC721Royalty) {}
 
   function _beforeTokenTransfer(address from, address to, uint256 tokenId)
@@ -297,23 +360,36 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    *      Reveal / Mint      *
    ***************************/
 
-  function setDict(string[] memory dict) public onlyOwner revealedStatus(false) {
-    _DICT = dict;
+  /**
+   * @dev Sets the dictionary to build the metadata array from
+   * @param dict_ The dictionary, basically a simple string array
+   */
+  function setDict(string[] memory dict_) public onlyOwner revealedStatus(false) {
+    _DICT = dict_;
   }
 
-  function setMetadata(uint16[2] calldata range, uint16[][] calldata metadata) external onlyOwner {
-    require(range[0] >= 0 && range[0] < range[1] && range[1] <= MAX_SUPPLY, "B: Range incorrect");
-    for (uint i = 0; i < range[1] - range[0]; i++) {
-      uint tokenId_ = i + range[0];
+  /**
+   * @dev This method is very important and sets the metadata that will be used later to build the TokenURI JSON for
+   *      each and every NFT. It is index based off of the dictionary in order to save space and gas cost.
+   *      This method effectively prepares for the reveal to happen. It is re-callable until metadata has been frozen
+   *      to allow for fixing potential mistakes. The process has been tested and validated, but, we never know, and
+   *      since metadata will be on-chain and virtually frozen, we better make sure.
+   * @param range_ is the range of metadata currently being uploaded, since the whole thing needs to happen in X tx
+   * @param metadata_ the metadata itself
+   */
+  function setMetadata(uint16[2] calldata range_, uint16[][] calldata metadata_) external onlyOwner {
+    require(range_[0] >= 0 && range_[0] < range_[1] && range_[1] <= MAX_SUPPLY, "B: Range incorrect");
+    for (uint i = 0; i < range_[1] - range_[0]; i++) {
+      uint tokenId_ = i + range_[0];
 
-      _beachMetadata[tokenId_][0] = metadata[i][0];
-      _beachMetadata[tokenId_][1] = metadata[i][1];
-      _beachMetadata[tokenId_][2] = metadata[i][2];
-      _beachMetadata[tokenId_][3] = metadata[i][3];
-      _beachMetadata[tokenId_][4] = metadata[i][4];
-      _beachMetadata[tokenId_][5] = metadata[i][5];
-      _beachMetadata[tokenId_][6] = metadata[i][6];
-      _beachMetadata[tokenId_][7] = metadata[i][7];
+      _beachMetadata[tokenId_][0] = metadata_[i][0];
+      _beachMetadata[tokenId_][1] = metadata_[i][1];
+      _beachMetadata[tokenId_][2] = metadata_[i][2];
+      _beachMetadata[tokenId_][3] = metadata_[i][3];
+      _beachMetadata[tokenId_][4] = metadata_[i][4];
+      _beachMetadata[tokenId_][5] = metadata_[i][5];
+      _beachMetadata[tokenId_][6] = metadata_[i][6];
+      _beachMetadata[tokenId_][7] = metadata_[i][7];
     }
   }
 
@@ -321,18 +397,31 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     return _revealed;
   }
 
-  function reveal(string[] calldata paths) external onlyOwner {
+  /**
+   * @dev Reveals the collection and sets the IPFS folders
+   * @param paths_ An array of 2 IPFS paths to set the images for TokenURI JSON building
+   */
+  function reveal(string[] calldata paths_) external onlyOwner {
     require(!_revealed, "B: already revealed");
     _revealed = true;
-    _revealedPath[0] = paths[0];
-    _revealedPath[1] = paths[1];
+    _revealedPath[0] = paths_[0];
+    _revealedPath[1] = paths_[1];
     emit Revealed();
   }
 
-  function resolveLobster(address target) public view returns (uint) {
-    return IERC721(_lobster).balanceOf(target);
+  /**
+   * @dev Internal helper to check the lobsters balance
+   * @param target_ The target to check the balance for
+   */
+  function resolveLobster(address target_) public view returns (uint) {
+    return IERC721(_lobster).balanceOf(target_);
   }
 
+  /**
+   * @dev A really important method that returns the price for the mint given current supply and whether you're
+   *      WaveListed or not. It does *not* check whether you are *actually* WaveListed, this is just to get price ranges
+   * @param isWaveList_ whether or not your are WaveListed. This method does not verify.
+   */
   function getMintPrice(bool isWaveList_) public view returns (uint) {
     uint currentSupply = totalSupply();
 
@@ -348,13 +437,27 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     return 1 ether;
   }
 
+  /**
+   * @dev This method is the one that will be used for Mint and UI / UX to tell you your mint price.
+   *      It will check the provided merkleProof and your Lobster balance to confirm whether you're WaveListed or not.
+   * @param merkleProof_ The array of proofs to confirm your address is in the Merkle Tree or not
+   */
   function getMyPriceForNextMint(bytes32[] calldata merkleProof_) public view returns (uint) {
     return getMintPrice(amIWaveListed(merkleProof_));
   }
 
-  /**************************
-   *    Payment Splitter    *
-   **************************/
+  /***************************
+   *                         *
+   *    ================     *
+   *    Payment Splitter     *
+   *    ================     *
+   *                         *
+   *  All the methods under  *
+   *  exist to manage        *
+   *  Payment Splitting      *
+   *  during mint and after  *
+   *                         *
+   ***************************/
 
   function _addPayee(address account_, uint8 shares_) private {
     require(account_ != address(0), "PS: No 0");

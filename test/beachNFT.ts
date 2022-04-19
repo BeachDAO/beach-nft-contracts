@@ -362,9 +362,47 @@ describe("Beach NFT", function () {
   });
 
   describe("NFT", async function () {
-    describe("Supply", function () {
+    describe("Basics", async function () {
+      it("Should be able to transfer NFT", async function () {
+        const address1address = await address3.getAddress();
+        const address3address = await address3.getAddress();
+        await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
+        expect(
+          await beachNFT.ownerOf((await beachNFT.totalSupply()) - 1),
+          "Owner of the latest NFT should be the minter"
+        ).to.equal(address3address);
+        await beachNFT
+          .connect(address3)
+          .transferFrom(address3address, address1address, 0);
+        expect(await beachNFT.ownerOf(0)).to.equal(address1address);
+      });
+    });
+
+    describe("Supply", async function () {
       it("Should have a supply limit to 1337", async function () {
         expect(await beachNFT.MAX_SUPPLY()).to.equal(MAX_SUPPLY);
+      });
+
+      it("Should have a first index of 0", async function () {
+        // Should equal 0 when nothing has been minted
+        expect(await beachNFT.totalSupply()).to.equal(0);
+      });
+
+      it("Should increment by 1 for each mint (safeMint)", async function () {
+        // Should equal 1 after 1 mint
+        await beachNFT
+          .connect(multiSigOwner)
+          .safeMint(await address1.getAddress());
+        expect(await beachNFT.totalSupply()).to.equal(1);
+      });
+
+      it("Should have correct totalSupply()", async function () {
+        expect(await beachNFT.totalSupply()).to.equal(0);
+        // Should equal 1 after 1 mint
+        await beachNFT
+          .connect(multiSigOwner)
+          .safeMint(await address1.getAddress());
+        expect(await beachNFT.totalSupply()).to.equal(1);
       });
 
       // Slow test
@@ -409,32 +447,34 @@ describe("Beach NFT", function () {
       });
     });
 
-    it("Should be unrevealed by default", async function () {
-      expect(await beachNFT.revealState()).to.equal(false);
-    });
+    describe("Reveal", async function () {
+      it("Should be unrevealed by default", async function () {
+        expect(await beachNFT.revealState()).to.equal(false);
+      });
 
-    it("Should be able to reveal if owner", async function () {
-      await beachNFT.connect(multiSigOwner).reveal(revealPath);
-      expect(await beachNFT.revealState()).to.equal(true);
-    });
+      it("Should be able to reveal if owner", async function () {
+        await beachNFT.connect(multiSigOwner).reveal(revealPath);
+        expect(await beachNFT.revealState()).to.equal(true);
+      });
 
-    it("Should not be able to reveal if not owner", async function () {
-      await expect(beachNFT.connect(address1).reveal(revealPath)).to.be
-        .reverted;
-      await expect(beachNFT.connect(address2).reveal(revealPath)).to.be
-        .reverted;
-    });
+      it("Should not be able to reveal if not owner", async function () {
+        await expect(beachNFT.connect(address1).reveal(revealPath)).to.be
+          .reverted;
+        await expect(beachNFT.connect(address2).reveal(revealPath)).to.be
+          .reverted;
+      });
 
-    it("Should only enable reveal once", async function () {
-      await beachNFT.connect(multiSigOwner).reveal(revealPath);
-      await expect(
-        beachNFT.connect(multiSigOwner).reveal(revealPath)
-      ).to.be.revertedWith("B: already revealed");
-    });
+      it("Should only enable reveal once", async function () {
+        await beachNFT.connect(multiSigOwner).reveal(revealPath);
+        await expect(
+          beachNFT.connect(multiSigOwner).reveal(revealPath)
+        ).to.be.revertedWith("B: already revealed");
+      });
 
-    it("Should point to default metadata until reveal", async function () {
-      const metadata = await beachNFT.tokenURI(0);
-      expect(metadata).to.equal(basePathBase64JSON);
+      it("Should point to default metadata until reveal", async function () {
+        const metadata = await beachNFT.tokenURI(0);
+        expect(metadata).to.equal(basePathBase64JSON);
+      });
     });
 
     describe("NFT Metadata", async function () {
@@ -509,57 +549,57 @@ describe("Beach NFT", function () {
       });
     });
 
-    it("Should have a first index of 0", async function () {
-      // Should equal 0 when nothing has been minted
-      expect(await beachNFT.totalSupply()).to.equal(0);
+    describe("Name", async function () {
+      it("Should have a name", async function () {
+        await beachNFT
+          .connect(multiSigOwner)
+          .safeMint(await address1.getAddress());
+        expect(await beachNFT.beachName(0)).to.equal("Beach #0");
+      });
+
+      it("Setting a name should be free is $SEAFOOD contract hasn't been set", async function () {
+        await beachNFT317
+          .connect(multiSigOwner)
+          .safeMint(await multiSigOwner.getAddress());
+        const id = (await beachNFT317.connect(multiSigOwner).totalSupply()) - 1;
+        await beachNFT317.connect(multiSigOwner).setName(id, "SUP");
+
+        expect(await beachNFT317.beachName(id)).to.equal("Beach SUP");
+      });
     });
 
-    it("Should increment by 1 for each mint (safeMint)", async function () {
-      // Should equal 1 after 1 mint
-      await beachNFT
-        .connect(multiSigOwner)
-        .safeMint(await address1.getAddress());
-      expect(await beachNFT.totalSupply()).to.equal(1);
-    });
+    describe("Mint", async function () {
+      it("Should only mint passed a certain block time", async function () {
+        // Price is 0 for address1 (current owner) because it has 1 Lobster.
+        await expect(
+          beachNFTMint.connect(address1).gimmeBeaches(1, [])
+        ).to.be.revertedWith("B: Mint block not ready");
+        await advanceBlocks(blocksUntilMintOpens);
+        await beachNFTMint.connect(address1).gimmeBeaches(1, []);
+        expect(
+          await beachNFTMint.balanceOf(await address1.getAddress())
+        ).to.equal(1);
+      });
 
-    it("Should have correct totalSupply()", async function () {
-      expect(await beachNFT.totalSupply()).to.equal(0);
-      // Should equal 1 after 1 mint
-      await beachNFT
-        .connect(multiSigOwner)
-        .safeMint(await address1.getAddress());
-      expect(await beachNFT.totalSupply()).to.equal(1);
-    });
+      it("Should only enable minting 1 during the first phase", async function () {
+        await expect(
+          beachNFTMint.connect(address2).gimmeBeaches(3, []),
+          "Minting more than 1 during first phase should not be possible"
+        ).to.be.reverted;
+        await expect(
+          beachNFTMint.connect(address2).gimmeBeaches(1, []),
+          "Minting just one should be good"
+        ).to.be.ok;
+      });
 
-    it("Should have a name", async function () {
-      await beachNFT
-        .connect(multiSigOwner)
-        .safeMint(await address1.getAddress());
-      expect(await beachNFT.beachName(0)).to.equal("Beach #0");
-    });
-
-    it("Setting a name should be free is $SEAFOOD contract hasn't been set", async function () {
-      await beachNFT317
-        .connect(multiSigOwner)
-        .safeMint(await multiSigOwner.getAddress());
-      const id = (await beachNFT317.connect(multiSigOwner).totalSupply()) - 1;
-      await beachNFT317.connect(multiSigOwner).setName(id, "SUP");
-
-      expect(await beachNFT317.beachName(id)).to.equal("Beach SUP");
-    });
-
-    it("Should be able to transfer NFT", async function () {
-      const address1address = await address3.getAddress();
-      const address3address = await address3.getAddress();
-      await beachNFT.connect(address3).gimmeBeaches(1, [], priceOverride1);
-      expect(
-        await beachNFT.ownerOf((await beachNFT.totalSupply()) - 1),
-        "Owner of the latest NFT should be the minter"
-      ).to.equal(address3address);
-      await beachNFT
-        .connect(address3)
-        .transferFrom(address3address, address1address, 0);
-      expect(await beachNFT.ownerOf(0)).to.equal(address1address);
+      it("Should enable normal minting up to max after the first phase", async function () {
+        await expect(
+          beachNFT137
+            .connect(addressArt)
+            .gimmeBeaches(3, [], priceOverride0073x3),
+          "Minting up to 3 after first phase should be good"
+        ).to.be.ok;
+      });
     });
   });
 
@@ -1196,20 +1236,6 @@ describe("Beach NFT", function () {
     });
   });
 
-  describe("Mint", async function () {
-    it("Should only mint passed a certain block time", async function () {
-      // Price is 0 for address1 (current owner) because it has 1 Lobster.
-      await expect(
-        beachNFTMint.connect(address1).gimmeBeaches(1, [])
-      ).to.be.revertedWith("B: Mint block not ready");
-      await advanceBlocks(blocksUntilMintOpens);
-      await beachNFTMint.connect(address1).gimmeBeaches(1, []);
-      expect(
-        await beachNFTMint.balanceOf(await address1.getAddress())
-      ).to.equal(1);
-    });
-  });
-
   xdescribe("SEAFOOD ERC20", function () {
     //
     // **** ERC20 ****
@@ -1280,7 +1306,7 @@ describe("Beach NFT", function () {
 
       beforeEach(async function () {
         // Mint 1 NFT
-        await beachNFT.connect(address2).gimmeBeaches(5, []);
+        await beachNFT.connect(address2).gimmeBeaches(1, []);
 
         // Approve staking contract
         await beachNFT

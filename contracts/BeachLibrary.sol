@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC721Enumerable.sol";
 
@@ -105,7 +105,6 @@ library BeachLibrary {
     }
     return string(buffer);
   }
-
 
   function isContract(address account) internal view returns (bool) {
     // This method relies on extcodesize, which returns 0 for contracts in
@@ -253,8 +252,8 @@ library BeachLibrary {
                 abi.encodePacked(
                   '{',
                   '"name": "B34CH DAO",',
-                  '"description": "B34CH DAO",',
-                  '"image": "https://openseacreatures.io/image.png"', // TODO: Finalize this
+                  '"description": "What\'s the ocean if not Mother Nature\'s generative art?\n\n  B34CH is procedurally formed by code. The varieties of waves, particles, colors, textures, sizes combine to create digital representations of realistic and surreal beaches.",',
+                  '"image": "https://b34ch.page.link/opensea_cover"',
                   '"external_link": "https://b34ch.xyz",',
                   '"seller_fee_basis_points": 1000,',
                   '"fee_recipient": "', beach_, '"',
