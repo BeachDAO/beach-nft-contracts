@@ -45,7 +45,6 @@ KKKKKKKKKKKKKKK00KKKKKKKKKKKK0KKKKKKKKK0KKKKKKKKKKK0KKK00KKKKK00KKKKKK00KKKKKKKK
 
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Royalty.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -65,12 +64,12 @@ interface ISeafood {
   function decimals() external view returns (uint8);
 }
 
-contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
+contract Beach is ERC721Enumerable, ERC721Royalty, Ownable {
   bool private _revealed = false;
-  string private _baseURIPath = "https://ipfs.io/ipfs/";
-  string private _placeholderURI = "QmZc5HkKqUf1UiL9xqpanvbETB83Ter21AqMRUo1mbv9PN";
+  string private _baseURIPath = "https://url.b34ch.xyz/ipfs/";
+  string private _placeholderURI = "Qmb4efNTGFfFeMmYNoMWKwhPkvQkfeNLo4kgZqi72JAL6S";
   string[2] private _revealedPath = ["", ""];
-  bool private _freezeBasePath = false;
+  bool private _frozen = false;
 
   bytes32 public waveListMerkleRoot;
   uint public MAX_SUPPLY = 1337;
@@ -107,10 +106,10 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   event Revealed();
   event NameChanged(uint256 tokenId, string name);
 
-  constructor(address lobster_, uint blocksBeforeTheMint_, string[] memory traits_) ERC721("B34CH DAO", "B34CH") {
+  constructor(address lobster_, uint blockToMint_, string[] memory traits_) ERC721("B34CH DAO", "B34CH") {
     _lobster = lobster_;
     _setDefaultRoyalty(address(this), 1000);
-    _mintBlock = block.number + blocksBeforeTheMint_;
+    _mintBlock = blockToMint_ > 100000 ? blockToMint_ : block.number + blockToMint_;
     _TRAITS = traits_;
   }
 
@@ -137,21 +136,17 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     return BeachLibrary.walletOfOwner(wallet_, address(this));
   }
 
-  modifier pathNotFrozen() {
-    require(!_freezeBasePath, "B: Base Path frozen");
-    _;
-  }
-
   // Function intended to be triggered by the DAO in case the Gateway or Network has an issue
-  function updateBaseURI(string memory uri_) external onlyOwner pathNotFrozen {
+  function updateBaseURI(string memory uri_) external onlyOwner {
+    require(!_frozen, "B: Frozen");
     _baseURIPath = uri_;
   }
 
   /**
    * @dev Allows the owner to freeze the path so it can't be changed anymore once it has settled
    */
-  function freezeBasePath() external onlyOwner pathNotFrozen {
-    _freezeBasePath = true;
+  function freezeMetadata() external onlyOwner {
+    _frozen = true;
   }
 
   /**
@@ -159,7 +154,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    * @param tokenId_ TokenId to retrieve the path for
    */
   function getRevealedPath(uint256 tokenId_) internal view returns (string memory) {
-    return tokenId_ < 1000 ? _revealedPath[0] : _revealedPath[1];
+    return tokenId_ <= 1000 ? _revealedPath[0] : _revealedPath[1];
   }
 
   /**
@@ -186,16 +181,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
       beachName(tokenId_),
       BeachLibrary.getImagePath(tokenId_, _revealed, _baseURIPath, getRevealedPath(tokenId_), _placeholderURI, true),
       BeachLibrary.getImagePath(tokenId_, _revealed, _baseURIPath, getRevealedPath(tokenId_), _placeholderURI, false),
-      _revealed ? BeachLibrary.hashToMetadata(tokenId_, _TRAITS, _DICT, _beachMetadata) : '[]');
-  }
-
-  /**
-   * @dev Returns whether a reveal status matches the boolean passed.
-   * @param revealStatus_ The status to check for
-   */
-  modifier revealedStatus(bool revealStatus_) {
-    require(_revealed == revealStatus_);
-    _;
+      _revealed ? BeachLibrary.dictToMetadata(tokenId_, _TRAITS, _DICT, _beachMetadata) : '[]');
   }
 
   /**
@@ -251,7 +237,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    */
   function _mintABeach(address to_) internal {
     require(totalSupply() < MAX_SUPPLY, "B: max supply reached");
-    _safeMint(to_, totalSupply());
+    _safeMint(to_, totalSupply() + 1);
   }
 
   /**
@@ -305,6 +291,8 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    * @param tokenId_ The token ID to return the name of
    */
   function beachName(uint tokenId_) public view returns (string memory) {
+    _exists(tokenId_);
+
     bool isEmpty = keccak256(abi.encodePacked(_beachNames[tokenId_])) == keccak256(abi.encodePacked("")) || keccak256(abi.encodePacked(_beachNames[tokenId_])) == keccak256(bytes(BeachLibrary.toString(tokenId_)));
     return string(abi.encodePacked("Beach ", isEmpty ? string(abi.encodePacked("#", BeachLibrary.toString(tokenId_))) : _beachNames[tokenId_]));
   }
@@ -348,7 +336,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
   function supportsInterface(bytes4 interfaceId)
   public
   view
-  override(ERC721, ERC721Enumerable, ERC721Royalty)
+  override(ERC721Enumerable, ERC721Royalty)
   returns (bool)
   {
     return super.supportsInterface(interfaceId);
@@ -364,7 +352,8 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    * @dev Sets the dictionary to build the metadata array from
    * @param dict_ The dictionary, basically a simple string array
    */
-  function setDict(string[] memory dict_) public onlyOwner revealedStatus(false) {
+  function setDict(string[] memory dict_) public onlyOwner {
+    require(!_frozen, "B: Frozen");
     _DICT = dict_;
   }
 
@@ -378,7 +367,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    * @param metadata_ the metadata itself
    */
   function setMetadata(uint16[2] calldata range_, uint16[][] calldata metadata_) external onlyOwner {
-    require(range_[0] >= 0 && range_[0] < range_[1] && range_[1] <= MAX_SUPPLY, "B: Range incorrect");
+    require(!_frozen && range_[0] > 0 && range_[0] < range_[1] && range_[1] <= 1338, "B: Range incorrect");
     for (uint i = 0; i < range_[1] - range_[0]; i++) {
       uint tokenId_ = i + range_[0];
 
@@ -423,16 +412,22 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
    * @param isWaveList_ whether or not your are WaveListed. This method does not verify.
    */
   function getMintPrice(bool isWaveList_) public view returns (uint) {
-    uint currentSupply = totalSupply();
+    uint cId = totalSupply() + 1;
+    uint zero = 0 ether;
+    uint one = 1 ether;
+    uint t1 = 0.037 ether;
+    uint t2 = 0.073 ether;
+    uint t3 = 0.1 ether;
+    uint t4 = 0.1337 ether;
 
-    if (currentSupply < 137) {
-      return isWaveList_ ? 0 ether : 1 ether;
-    } else if (currentSupply >= 137 && currentSupply < 317) {
-      return isWaveList_ ? 0.037 ether : 0.073 ether;
-    } else if (currentSupply >= 317 && currentSupply < 713) {
-      return isWaveList_ ? 0.073 ether : 0.1 ether;
-    } else if (currentSupply >= 713) {
-      return isWaveList_ ? 0.1 ether : 0.1337 ether;
+    if (cId <= 137) {
+      return isWaveList_ ? zero : one;
+    } else if (cId > 137 && cId <= 317) {
+      return isWaveList_ ? t1 : t2;
+    } else if (cId > 317 && cId <= 713) {
+      return isWaveList_ ? t2 : t3;
+    } else if (cId > 713) {
+      return isWaveList_ ? t3 : t4;
     }
     return 1 ether;
   }
@@ -463,7 +458,7 @@ contract Beach is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     require(account_ != address(0), "PS: No 0");
     require(shares_ > 0, "PS: Shares = 0");
     require(_totalShares + shares_ < 256, "PS: Max shares");
-    require(_payees.length < 256, "PS: Too many shareholders");
+    require(_payees.length < 256, "PS: Too many sh");
 
     // Flush outstanding balances to ensure that new payees don't mess things up
     _splitOutstandingBalance();

@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC721Enumerable.sol";
 
-// From https://etherscan.io/address/0xbad6186e92002e312078b5a1dafd5ddf63d3f731#code
+// Some code are originally from https://etherscan.io/address/0xbad6186e92002e312078b5a1dafd5ddf63d3f731#code
 library BeachLibrary {
   string internal constant TABLE =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -83,7 +83,7 @@ library BeachLibrary {
 
   /**
    * @dev Converts a `uint256` to its ASCII `string` decimal representation.
-     */
+   */
   function toString(uint256 value) internal pure returns (string memory) {
     // Inspired by OraclizeAPI's implementation - MIT licence
     // https://github.com/oraclize/ethereum-api/blob/b42146b063c7d6ee1358846c198246239e9360e8/oraclizeAPI_0.4.25.sol
@@ -168,9 +168,9 @@ library BeachLibrary {
   }
 
   /**
- * @dev Hash to metadata function
+   * @dev Converts the dictionary into metadata and returns the Token URI JSON
    */
-  function hashToMetadata(uint tokenId_, string[] memory TRAITS_, string[] memory DICT_, mapping(uint256 => uint16[8]) storage beachMetadata_)
+  function dictToMetadata(uint tokenId_, string[] memory TRAITS_, string[] memory DICT_, mapping(uint256 => uint16[8]) storage beachMetadata_)
   public
   view
   returns (string memory)
@@ -198,14 +198,8 @@ library BeachLibrary {
 
   function getImagePath(uint tokenId_, bool revealed_, string memory baseURIPath_, string memory revealedPath_, string memory placeHolderURI_, bool small_) public view returns (bytes memory) {
     return revealed_ ?
-    abi.encodePacked('"image": "', baseURIPath_, revealedPath_, '/', toString(tokenId_), small_ ? '.png",' : '_large.png",') :
-    abi.encodePacked('"image": "', baseURIPath_, placeHolderURI_, '",');
-  }
-
-  function getSmallImagePath(uint tokenId_, bool revealed_, string memory baseURIPath_, string memory revealedPath_, string memory placeHolderURI_) public view returns (bytes memory) {
-    return revealed_ ?
-    abi.encodePacked('"image": "', baseURIPath_, revealedPath_, '/', toString(tokenId_), '.png",') :
-    abi.encodePacked('"image": "', baseURIPath_, placeHolderURI_, '",');
+    abi.encodePacked('"image', small_ ? '' : '_large', '": "', baseURIPath_, revealedPath_, '/', toString(tokenId_), small_ ? '.png",' : '_large.png",') :
+    abi.encodePacked('"image', small_ ? '' : '_large', '": "', baseURIPath_, placeHolderURI_, '",');
   }
 
   function buildTokenURI(
@@ -224,9 +218,8 @@ library BeachLibrary {
             string(
               abi.encodePacked(
                 abi.encodePacked('{"name": "', beachName_, '",'),
-                '"description": "BEACH", ',
+                '"description": "What\'s the ocean if not Mother Nature\'s generative art? B34CH is procedurally formed by code. The varieties of waves, particles, colors, textures, sizes combine to create digital representations of realistic and surreal beaches.", ',
                 '"token_id": ', toString(tokenId_), ', ',
-                '"art_number": ', toString(tokenId_ + 1), ', ',
                 smallImagePath_,
                 bigImagePath_,
                 '"attributes":',
@@ -252,11 +245,11 @@ library BeachLibrary {
                 abi.encodePacked(
                   '{',
                   '"name": "B34CH DAO",',
-                  '"description": "What\'s the ocean if not Mother Nature\'s generative art?\n\n  B34CH is procedurally formed by code. The varieties of waves, particles, colors, textures, sizes combine to create digital representations of realistic and surreal beaches.",',
-                  '"image": "https://b34ch.page.link/opensea_cover"',
+                  '"description": "What\'s the ocean if not Mother Nature\'s generative art? B34CH is procedurally formed by code. The varieties of waves, particles, colors, textures, sizes combine to create digital representations of realistic and surreal beaches.",',
+                  '"image": "https://b34ch.page.link/opensea_cover",',
                   '"external_link": "https://b34ch.xyz",',
                   '"seller_fee_basis_points": 1000,',
-                  '"fee_recipient": "', beach_, '"',
+                  '"fee_recipient": "', addressToString(beach_), '"',
                   '}'
                 )
               )
@@ -279,5 +272,22 @@ library BeachLibrary {
       tokensId[i] = IERC721Enumerable(creed_).tokenOfOwnerByIndex(wallet_, i);
     }
     return tokensId;
+  }
+
+  function addressToString(address account) public pure returns (string memory) {
+    return bytesToString(abi.encodePacked(account));
+  }
+
+  function bytesToString(bytes memory data) public pure returns (string memory) {
+    bytes memory alphabet = "0123456789abcdef";
+
+    bytes memory str = new bytes(2 + data.length * 2);
+    str[0] = "0";
+    str[1] = "x";
+    for (uint i = 0; i < data.length; i++) {
+      str[2 + i * 2] = alphabet[uint(uint8(data[i] >> 4))];
+      str[3 + i * 2] = alphabet[uint(uint8(data[i] & 0x0f))];
+    }
+    return string(str);
   }
 }

@@ -19,7 +19,9 @@ const b34chABI = require("./../artifacts/contracts/Beach.sol/Beach.json").abi;
 const metadataMetadata = JSON.parse(
   fs.readFileSync("./metadata/dist/metadataToUpload.json")
 );
-const DICT = fs.readFileSync("./metadata/dist/metadataDictionary.json");
+const DICT = fs
+  .readFileSync("./metadata/dist/metadataDictionary.json")
+  .toJSON();
 const TRAITS = [
   "SAND",
   "WATER",
@@ -37,7 +39,7 @@ async function main() {
   const [deployer] = await hre.ethers.getSigners();
   console.log("Deploying contracts with the account:", deployer.address);
 
-  let addressArt, addressDev, addressDAO;
+  let addressArt, addressDev, addressDesign, addressDAO;
   let lobsterAddress;
   let blocksBeforeMintOpens;
 
@@ -50,10 +52,11 @@ async function main() {
     // const lobsterMockOnChain = await LobsterMock.deploy();
     lobsterAddress = "0x9AAd034C9B71B969b67DacB81Fc1aCfe49f1db79"; // lobsterMockOnChain.address;
     console.log("LobsterMock deployed at: ", lobsterAddress);
-    blocksBeforeMintOpens = 4800; // roughly 16 hours from now
+    // blocksBeforeMintOpens = 4800; // roughly 16 hours from now
+    blocksBeforeMintOpens = 5; // roughly 5 minutes from deployment
     addressArt = process.env.ADDRESSES_ART_RINKEBY;
     addressDev = process.env.ADDRESSES_DEV_RINKEBY;
-    // addressDesign = process.env.ADDRESSES_DESIGN_RINKEBY;
+    addressDesign = process.env.ADDRESSES_DESIGN_RINKEBY;
     addressDAO = process.env.ADDRESSES_DAO_RINKEBY;
     if (process.env.ADDRESSES_BEACHLIBRARY) {
       beachLibraryAddress = process.env.ADDRESSES_BEACHLIBRARY;
@@ -61,22 +64,26 @@ async function main() {
     if (process.env.ADDRESSES_BEACH) {
       beachAddress = process.env.ADDRESSES_BEACH;
     }
-  } else {
-    throw Error("Only Rinkeby network is supported at this point");
+  } else if (hre.network.name === "mainnet") {
+    // throw Error("Only Rinkeby network is supported at this point");
 
     // TODO: Set this to final values whenever all variables are set
-    // blocksBeforeMintOpens = 45818; // Roughly 1 week in the future.
-    // lobsterAddress = process.env.ADDRESSES_LOBSTER_CONTRACT_MAINNET;
-    // addressArt = process.env.ADDRESSES_ART_MAINNET;
-    // addressDev = process.env.ADDRESSES_DEV_MAINNET;
-    // addressDesign = process.env.ADDRESSES_DESIGN_MAINNET;
-    // addressDAO = process.env.ADDRESSES_DAO_MAINNET;
+    // Contract is polymorphic on block handling depending on block height
+    // blocksBeforeMintOpens = 14622045;
+    blocksBeforeMintOpens = 14628520;
+    lobsterAddress = process.env.ADDRESSES_LOBSTER_CONTRACT_MAINNET;
+    addressArt = process.env.ADDRESSES_ART_MAINNET;
+    addressDev = process.env.ADDRESSES_DEV_MAINNET;
+    addressDesign = process.env.ADDRESSES_DESIGN_MAINNET;
+    addressDAO = process.env.ADDRESSES_DAO_MAINNET;
   }
 
-  const accounts = [addressArt, addressDev, addressDAO];
-  const shares = [50, 25, 25];
+  const accounts = [addressDesign, addressArt, addressDev, addressDAO];
+  const shares = [15, 25, 15, 45];
 
   console.log("Deploying");
+  console.log("Accounts", accounts);
+
   console.log(lobsterAddress, blocksBeforeMintOpens, TRAITS);
 
   let beach, beachLibrary;
@@ -96,26 +103,28 @@ async function main() {
     );
     beachLibrary = await BeachLibraryContract.deploy();
     await beachLibrary.deployed();
+    beachLibraryAddress = beachLibrary.address;
   }
 
-  console.log("BeachLibrary contract deployed at", beachLibrary.address);
+  console.log("BeachLibrary contract deployed at", beachLibraryAddress);
 
   if (beachAddress) {
     beach = await hre.ethers.getContractAt(b34chABI, beachAddress, deployer);
   } else {
     const Beach = await hre.ethers.getContractFactory("Beach", {
       libraries: {
-        BeachLibrary: beachLibrary.address,
+        BeachLibrary: beachLibraryAddress,
       },
     });
     beach = await Beach.deploy(lobsterAddress, blocksBeforeMintOpens, TRAITS);
     await beach.deployed();
+    beachAddress = beach.address;
   }
 
-  console.log("BeachLibrary contract deployed at", beachLibrary.address);
+  console.log("Beach contract deployed at", beachAddress);
   console.log("Writing verification file");
 
-  const verificationFileName = `./scripts/verifications/verification_rinkeby_beach_${beach.address}.js`;
+  const verificationFileName = `./scripts/verifications/verification_${hre.network.name}_beach_${beachAddress}.js`;
   const verificationFileData = `module.exports = ${JSON.stringify([
     lobsterAddress,
     blocksBeforeMintOpens,
@@ -126,7 +135,7 @@ async function main() {
 
   console.log("Writing library addresses file");
 
-  const libraryAddressesFileName = `./scripts/verifications/verification_rinkeby_beach_addresses_${beach.address}.js`;
+  const libraryAddressesFileName = `./scripts/verifications/verification_${hre.network.name}_beach_addresses_${beachAddress}.js`;
   const libraryAddressesFileData = `module.exports = ${JSON.stringify({
     BeachLibrary: beachLibraryAddress,
   })};`;
@@ -135,7 +144,10 @@ async function main() {
     flag: "w",
   });
 
-  console.log("Beach deployed to:", beach.address);
+  console.log("Beach deployed to:", beachAddress);
+
+  console.log("Add Payees batch");
+  await beach.addPayeesBatch(accounts, shares);
 
   // await beach.setDict(DICT);
   //
